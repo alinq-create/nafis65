@@ -6,6 +6,36 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+async function fetchAndMergeQuestions(adminClient: any, examId: string) {
+  const { data: examQuestions } = await adminClient
+    .from("exam_questions")
+    .select("question_id, question_order, source_type")
+    .eq("exam_id", examId)
+    .order("question_order");
+
+  if (!examQuestions?.length) return null;
+
+  const imageIds = examQuestions.filter(q => q.source_type === "image").map(q => q.question_id);
+  const textIds = examQuestions.filter(q => q.source_type === "text").map(q => q.question_id);
+
+  const [imageResult, textResult] = await Promise.all([
+    imageIds.length > 0
+      ? adminClient.from("question_bank").select("id, question_type, page_image_name, frame_top, frame_left, frame_width, frame_height").in("id", imageIds)
+      : { data: [] },
+    textIds.length > 0
+      ? adminClient.from("text_question_bank").select("id, question_type, question_text, option_a, option_b, option_c, option_d").in("id", textIds)
+      : { data: [] },
+  ]);
+
+  const imageMap = new Map((imageResult.data || []).map(q => [q.id, { ...q, source_type: "image" }]));
+  const textMap = new Map((textResult.data || []).map(q => [q.id, { ...q, source_type: "text" }]));
+
+  return examQuestions.map(eq => {
+    const q = imageMap.get(eq.question_id) || textMap.get(eq.question_id);
+    return { ...q, question_order: eq.question_order };
+  });
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -54,37 +84,16 @@ serve(async (req) => {
         });
       }
 
-      // Get exam questions (WITHOUT correct_answer)
-      const { data: examQuestions } = await adminClient
-        .from("exam_questions")
-        .select("question_id, question_order")
-        .eq("exam_id", exam.id)
-        .order("question_order");
-
-      if (!examQuestions?.length) {
+      const orderedQuestions = await fetchAndMergeQuestions(adminClient, exam.id);
+      if (!orderedQuestions) {
         return new Response(JSON.stringify({ error: "لا توجد أسئلة في هذا الاختبار" }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      const questionIds = examQuestions.map((q) => q.question_id);
-      const { data: questions } = await adminClient
-        .from("question_bank")
-        .select("id, question_type, page_image_name, frame_top, frame_left, frame_width, frame_height")
-        .in("id", questionIds);
-
-      const orderedQuestions = examQuestions.map((eq) => {
-        const q = questions?.find((q) => q.id === eq.question_id);
-        return { ...q, question_order: eq.question_order };
-      });
-
       return new Response(
-        JSON.stringify({
-          examId: exam.id,
-          examName: exam.exam_name,
-          questions: orderedQuestions,
-        }),
+        JSON.stringify({ examId: exam.id, examName: exam.exam_name, questions: orderedQuestions }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -114,37 +123,16 @@ serve(async (req) => {
     // If exactly one exam, return its questions directly
     if (exams.length === 1) {
       const exam = exams[0];
-
-      const { data: examQuestions } = await adminClient
-        .from("exam_questions")
-        .select("question_id, question_order")
-        .eq("exam_id", exam.id)
-        .order("question_order");
-
-      if (!examQuestions?.length) {
+      const orderedQuestions = await fetchAndMergeQuestions(adminClient, exam.id);
+      if (!orderedQuestions) {
         return new Response(JSON.stringify({ error: "لا توجد أسئلة في هذا الاختبار" }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      const questionIds = examQuestions.map((q) => q.question_id);
-      const { data: questions } = await adminClient
-        .from("question_bank")
-        .select("id, question_type, page_image_name, frame_top, frame_left, frame_width, frame_height")
-        .in("id", questionIds);
-
-      const orderedQuestions = examQuestions.map((eq) => {
-        const q = questions?.find((q) => q.id === eq.question_id);
-        return { ...q, question_order: eq.question_order };
-      });
-
       return new Response(
-        JSON.stringify({
-          examId: exam.id,
-          examName: exam.exam_name,
-          questions: orderedQuestions,
-        }),
+        JSON.stringify({ examId: exam.id, examName: exam.exam_name, questions: orderedQuestions }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
