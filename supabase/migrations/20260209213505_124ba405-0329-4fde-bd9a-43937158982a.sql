@@ -1,0 +1,1 @@
+ALTER TABLE public.exam_questions DROP CONSTRAINT exam_questions_question_id_fkey;
