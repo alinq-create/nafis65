@@ -63,12 +63,29 @@ const QuestionBank = () => {
 
   const handleToggleVisibility = async (question: UnifiedQuestion) => {
     const table = question.source === 'image' ? 'question_bank' : 'text_question_bank';
+    const newValue = !question.visible_to_students;
 
-    await supabase
+    // Optimistic update
+    setQuestions(prev => prev.map(q => 
+      q.id === question.id && q.source === question.source 
+        ? { ...q, visible_to_students: newValue } 
+        : q
+    ));
+
+    const { error } = await supabase
       .from(table)
-      .update({ visible_to_students: !question.visible_to_students } as any)
+      .update({ visible_to_students: newValue } as any)
       .eq("id", question.id);
-    fetchQuestions();
+
+    if (error) {
+      // Revert on failure
+      setQuestions(prev => prev.map(q => 
+        q.id === question.id && q.source === question.source 
+          ? { ...q, visible_to_students: !newValue } 
+          : q
+      ));
+      toast({ title: "فشل تحديث حالة الظهور", variant: "destructive" });
+    }
   };
 
   const getImageUrl = (question: UnifiedQuestion) => {
@@ -114,7 +131,7 @@ const QuestionBank = () => {
                     <TableHead className="text-right">النوع</TableHead>
                     <TableHead className="text-right">الإجابة</TableHead>
                     <TableHead className="text-right">معاينة</TableHead>
-                    <TableHead className="text-right">يظهر للطالبات</TableHead>
+                    <TableHead className="text-right w-[80px]">يظهر للطالبات</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
