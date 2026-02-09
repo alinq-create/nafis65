@@ -1,0 +1,449 @@
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
+
+export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.1"
+  }
+  public: {
+    Tables: {
+      class_permissions: {
+        Row: {
+          created_at: string
+          from_class: number
+          id: string
+          teacher_id: string
+          to_class: number
+        }
+        Insert: {
+          created_at?: string
+          from_class: number
+          id?: string
+          teacher_id: string
+          to_class: number
+        }
+        Update: {
+          created_at?: string
+          from_class?: number
+          id?: string
+          teacher_id?: string
+          to_class?: number
+        }
+        Relationships: []
+      }
+      exam_questions: {
+        Row: {
+          exam_id: string
+          id: string
+          question_id: string
+          question_order: number
+        }
+        Insert: {
+          exam_id: string
+          id?: string
+          question_id: string
+          question_order?: number
+        }
+        Update: {
+          exam_id?: string
+          id?: string
+          question_id?: string
+          question_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exam_questions_exam_id_fkey"
+            columns: ["exam_id"]
+            isOneToOne: false
+            referencedRelation: "exams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exam_questions_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "question_bank"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      exams: {
+        Row: {
+          created_at: string
+          exam_code: string
+          exam_name: string
+          id: string
+          status: string
+          subject: string
+          target_classes: number[]
+          teacher_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          exam_code: string
+          exam_name: string
+          id?: string
+          status?: string
+          subject?: string
+          target_classes?: number[]
+          teacher_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          exam_code?: string
+          exam_name?: string
+          id?: string
+          status?: string
+          subject?: string
+          target_classes?: number[]
+          teacher_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          status: string
+          subject: string | null
+          updated_at: string
+          user_id: string
+          username: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          status?: string
+          subject?: string | null
+          updated_at?: string
+          user_id: string
+          username: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          status?: string
+          subject?: string | null
+          updated_at?: string
+          user_id?: string
+          username?: string
+        }
+        Relationships: []
+      }
+      question_bank: {
+        Row: {
+          correct_answer: string
+          created_at: string
+          frame_height: number
+          frame_left: number
+          frame_top: number
+          frame_width: number
+          id: string
+          notes: string | null
+          page_image_name: string
+          page_number: number
+          question_number: number
+          question_type: string
+          subject: string
+          teacher_id: string
+          updated_at: string
+          visible_to_students: boolean
+        }
+        Insert: {
+          correct_answer: string
+          created_at?: string
+          frame_height?: number
+          frame_left?: number
+          frame_top?: number
+          frame_width?: number
+          id?: string
+          notes?: string | null
+          page_image_name: string
+          page_number: number
+          question_number: number
+          question_type?: string
+          subject?: string
+          teacher_id: string
+          updated_at?: string
+          visible_to_students?: boolean
+        }
+        Update: {
+          correct_answer?: string
+          created_at?: string
+          frame_height?: number
+          frame_left?: number
+          frame_top?: number
+          frame_width?: number
+          id?: string
+          notes?: string | null
+          page_image_name?: string
+          page_number?: number
+          question_number?: number
+          question_type?: string
+          subject?: string
+          teacher_id?: string
+          updated_at?: string
+          visible_to_students?: boolean
+        }
+        Relationships: []
+      }
+      student_answers: {
+        Row: {
+          attempt_id: string
+          auto_correct: boolean | null
+          id: string
+          question_id: string
+          student_answer: string | null
+        }
+        Insert: {
+          attempt_id: string
+          auto_correct?: boolean | null
+          id?: string
+          question_id: string
+          student_answer?: string | null
+        }
+        Update: {
+          attempt_id?: string
+          auto_correct?: boolean | null
+          id?: string
+          question_id?: string
+          student_answer?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_answers_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: false
+            referencedRelation: "student_attempts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_answers_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "question_bank"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_attempts: {
+        Row: {
+          approved_score: number | null
+          auto_score: number | null
+          class_number: number
+          exam_id: string
+          id: string
+          status: string
+          student_name: string
+          submission_time: string
+        }
+        Insert: {
+          approved_score?: number | null
+          auto_score?: number | null
+          class_number: number
+          exam_id: string
+          id?: string
+          status?: string
+          student_name: string
+          submission_time?: string
+        }
+        Update: {
+          approved_score?: number | null
+          auto_score?: number | null
+          class_number?: number
+          exam_id?: string
+          id?: string
+          status?: string
+          student_name?: string
+          submission_time?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_attempts_exam_id_fkey"
+            columns: ["exam_id"]
+            isOneToOne: false
+            referencedRelation: "exams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      generate_exam_code: { Args: { p_subject: string }; Returns: string }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_admin: { Args: never; Returns: boolean }
+      is_teacher: { Args: never; Returns: boolean }
+    }
+    Enums: {
+      app_role: "admin" | "teacher"
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+}
+
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  public: {
+    Enums: {
+      app_role: ["admin", "teacher"],
+    },
+  },
+} as const
