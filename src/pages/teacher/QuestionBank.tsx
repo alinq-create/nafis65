@@ -7,13 +7,35 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import type { Tables } from "@/integrations/supabase/types";
 
-type Question = Tables<"question_bank">;
+interface UnifiedQuestion {
+  id: string;
+  source: string;
+  subject: string;
+  grade: string;
+  semester: string;
+  question_number: number;
+  question_type: string;
+  question_text: string | null;
+  correct_answer: string;
+  option_a: string | null;
+  option_b: string | null;
+  option_c: string | null;
+  option_d: string | null;
+  page_image_name: string | null;
+  teacher_id: string;
+  frame_top: number | null;
+  frame_left: number | null;
+  frame_width: number | null;
+  frame_height: number | null;
+  visible_to_students: boolean;
+  notes: string | null;
+  created_at: string;
+}
 
 const QuestionBank = () => {
   const { authUser } = useAuth();
-  const [questions, setQuestions] = useState<Question[]>([]);
+  const [questions, setQuestions] = useState<UnifiedQuestion[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
@@ -22,15 +44,16 @@ const QuestionBank = () => {
     
     const teacherSubject = authUser.profile?.subject || "رياضيات";
     
-    // Fetch questions matching teacher's subject (includes shared questions from system_admin)
-    const { data } = await supabase
-      .from("question_bank")
-      .select("*")
-      .eq("subject", teacherSubject)
-      .order("page_number", { ascending: true })
-      .order("question_number", { ascending: true });
+    const { data, error } = await supabase.rpc('get_teacher_questions', {
+      p_subject: teacherSubject,
+    });
 
-    setQuestions(data ?? []);
+    if (error) {
+      console.error("Error fetching questions:", error);
+      toast({ title: "خطأ في جلب الأسئلة", variant: "destructive" });
+    }
+
+    setQuestions((data as UnifiedQuestion[]) ?? []);
     setLoading(false);
   };
 
@@ -38,19 +61,25 @@ const QuestionBank = () => {
     fetchQuestions();
   }, [authUser]);
 
-  const handleToggleVisibility = async (question: Question) => {
+  const handleToggleVisibility = async (question: UnifiedQuestion) => {
+    const table = question.source === 'image' ? 'question_bank' : 'text_question_bank';
+    
+    // text_question_bank doesn't have visible_to_students column managed by teachers
+    // Only image questions support toggling for now
+    if (question.source === 'text') {
+      toast({ title: "الأسئلة النصية مرئية دائماً للطالبات", variant: "default" });
+      return;
+    }
+
     await supabase
-      .from("question_bank")
+      .from(table)
       .update({ visible_to_students: !question.visible_to_students })
       .eq("id", question.id);
     fetchQuestions();
   };
 
-  
-
-  const getImageUrl = (question: Question) => {
-    if (!authUser) return "";
-    // Check if this is a shared question (from system_admin) or teacher's own
+  const getImageUrl = (question: UnifiedQuestion) => {
+    if (!authUser || !question.page_image_name) return "";
     const isOwnQuestion = question.teacher_id === authUser.user.id;
     const path = isOwnQuestion
       ? `${authUser.user.id}/${question.page_image_name}`
@@ -88,7 +117,6 @@ const QuestionBank = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="text-right">الصفحة</TableHead>
                     <TableHead className="text-right">رقم السؤال</TableHead>
                     <TableHead className="text-right">النوع</TableHead>
                     <TableHead className="text-right">الإجابة</TableHead>
@@ -98,8 +126,7 @@ const QuestionBank = () => {
                 </TableHeader>
                 <TableBody>
                   {questions.map((q) => (
-                    <TableRow key={q.id}>
-                      <TableCell>{q.page_number}</TableCell>
+                    <TableRow key={`${q.source}-${q.id}`}>
                       <TableCell>{q.question_number}</TableCell>
                       <TableCell>
                         <Badge variant="secondary">
@@ -108,19 +135,26 @@ const QuestionBank = () => {
                       </TableCell>
                       <TableCell className="font-medium">{q.correct_answer}</TableCell>
                       <TableCell>
-                        <div
-                          className="w-24 h-16 bg-muted rounded overflow-hidden relative"
-                          style={{
-                            backgroundImage: `url(${getImageUrl(q)})`,
-                            backgroundSize: `${100 / q.frame_width}% ${100 / q.frame_height}%`,
-                            backgroundPosition: `${q.frame_left * 100}% ${q.frame_top * 100}%`,
-                          }}
-                        />
+                        {q.page_image_name && q.frame_width && q.frame_height ? (
+                          <div
+                            className="w-24 h-16 bg-muted rounded overflow-hidden relative"
+                            style={{
+                              backgroundImage: `url(${getImageUrl(q)})`,
+                              backgroundSize: `${100 / q.frame_width}% ${100 / q.frame_height}%`,
+                              backgroundPosition: `${(q.frame_left ?? 0) * 100}% ${(q.frame_top ?? 0) * 100}%`,
+                            }}
+                          />
+                        ) : (
+                          <p className="text-sm text-muted-foreground max-w-[200px] truncate">
+                            {q.question_text || "—"}
+                          </p>
+                        )}
                       </TableCell>
                       <TableCell>
                         <Switch
                           checked={q.visible_to_students}
                           onCheckedChange={() => handleToggleVisibility(q)}
+                          disabled={q.source === 'text'}
                         />
                       </TableCell>
                     </TableRow>
