@@ -48,6 +48,13 @@ serve(async (req) => {
     const { action, name, username, password, subject, fromClass, toClass } = await req.json();
 
     if (action === "create") {
+      // Validate username is Latin characters only
+      if (!username || !/^[a-zA-Z0-9._-]+$/.test(username)) {
+        return new Response(JSON.stringify({ error: "اسم المستخدم يجب أن يكون بالإنجليزية فقط (أحرف وأرقام)" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       const email = `${username}@nafes.app`;
 
       // Create auth user
