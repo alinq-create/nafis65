@@ -115,6 +115,8 @@ const ImportQuestionBank = () => {
   const [report, setReport] = useState<ImportReport | null>(null);
   const [previewMode, setPreviewMode] = useState(false);
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
+  const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
+  const [importPhase, setImportPhase] = useState<"idle" | "uploading" | "saving">("idle");
 
   const excelInputRef = useRef<HTMLInputElement>(null);
   const imagesInputRef = useRef<HTMLInputElement>(null);
@@ -220,44 +222,95 @@ const ImportQuestionBank = () => {
     if (!authUser || questionsWithImageCheck.length === 0) return;
 
     setImporting(true);
-    const missingImages: string[] = [];
-    let uploadedImages = 0;
+    setImportPhase("uploading");
+    setUploadProgress(null);
 
     try {
-      // 1. Upload images to storage
+      // 1. Upload images using Promise.allSettled
       const imageFileMap = new Map(imageFiles.map((f) => [f.name, f]));
       const uniqueImageNames = [...new Set(questionsWithImageCheck.map((q) => q.page_image_name).filter(Boolean))];
 
+      const missingImages: string[] = [];
+      let uploadedImages = 0;
+
+      // Separate missing (no file selected) vs files to upload
+      const filesToUpload: { name: string; file: File }[] = [];
       for (const imageName of uniqueImageNames) {
         const imageFile = imageFileMap.get(imageName);
         if (!imageFile) {
           missingImages.push(imageName);
-          continue;
-        }
-
-        const { error } = await supabase.storage
-          .from("question-images")
-          .upload(`shared/${imageName}`, imageFile, { upsert: true });
-
-        if (error) {
-          console.error(`فشل رفع ${imageName}:`, error.message);
-          missingImages.push(imageName);
         } else {
-          uploadedImages++;
+          filesToUpload.push({ name: imageName, file: imageFile });
         }
       }
 
-      // 2. Import questions via edge function (strip image_missing before sending)
+      if (filesToUpload.length > 0) {
+        setUploadProgress({ current: 0, total: filesToUpload.length });
+
+        const uploadPromises = filesToUpload.map(async ({ name, file }) => {
+          const { error } = await supabase.storage
+            .from("question-images")
+            .upload(`shared/${name}`, file, { upsert: true });
+          if (error) throw new Error(name);
+          return name;
+        });
+
+        const results = await Promise.allSettled(uploadPromises);
+        const failedUploads: string[] = [];
+        let completed = 0;
+
+        for (const result of results) {
+          completed++;
+          setUploadProgress({ current: completed, total: filesToUpload.length });
+          if (result.status === "fulfilled") {
+            uploadedImages++;
+          } else {
+            const failedName = result.reason?.message || "غير معروف";
+            failedUploads.push(failedName);
+          }
+        }
+
+        if (failedUploads.length > 0) {
+          toast({
+            title: "تحذير: فشل رفع بعض الصور",
+            description: `فشل رفع الصور التالية: ${failedUploads.join("، ")}`,
+            variant: "destructive",
+          });
+        }
+      }
+
+      // 2. Import questions via edge function with 60s timeout
+      setImportPhase("saving");
+      setUploadProgress(null);
+
       const questionsPayload = questionsWithImageCheck.map(
         ({ image_missing, ...rest }) => rest
       );
 
-      const { data, error } = await supabase.functions.invoke("import-question-bank", {
-        body: { questions: questionsPayload },
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
 
-      if (error) throw error;
+      let data: any;
+      try {
+        const response = await supabase.functions.invoke("import-question-bank", {
+          body: { questions: questionsPayload },
+        });
 
+        clearTimeout(timeoutId);
+
+        if (response.error) {
+          throw new Error(response.error.message || "حدث خطأ أثناء حفظ الأسئلة في قاعدة البيانات");
+        }
+        data = response.data;
+      } catch (invokeErr: any) {
+        clearTimeout(timeoutId);
+        if (invokeErr?.name === "AbortError" || controller.signal.aborted) {
+          throw new Error("تعذر الاستيراد، حاول مرة أخرى");
+        }
+        throw new Error(invokeErr?.message || "حدث خطأ أثناء حفظ الأسئلة في قاعدة البيانات");
+      }
+
+      // 3. Build report
       const importReport: ImportReport = {
         importedCount: data?.importedCount || 0,
         skippedCount: data?.skippedCount || 0,
@@ -267,7 +320,7 @@ const ImportQuestionBank = () => {
 
       setReport(importReport);
 
-      // 3. Build preview image URLs
+      // 4. Build preview image URLs
       const urls: Record<string, string> = {};
       for (const imageName of uniqueImageNames) {
         if (!missingImages.includes(imageName)) {
@@ -285,13 +338,16 @@ const ImportQuestionBank = () => {
         description: `${importReport.importedCount} سؤال جديد${importReport.skippedCount > 0 ? `، ${importReport.skippedCount} مكرر تم تخطيه` : ""}`,
       });
     } catch (err: any) {
+      const message = err?.message || "حدث خطأ غير متوقع، يرجى المحاولة مرة أخرى";
       toast({
         title: "خطأ في الاستيراد",
-        description: err.message,
+        description: message,
         variant: "destructive",
       });
     } finally {
       setImporting(false);
+      setImportPhase("idle");
+      setUploadProgress(null);
     }
   };
 
@@ -387,7 +443,11 @@ const ImportQuestionBank = () => {
                 {importing ? (
                   <>
                     <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent ml-2" />
-                    جاري الاستيراد...
+                    {importPhase === "uploading" && uploadProgress
+                      ? `جاري رفع الصور... (تم رفع ${uploadProgress.current} من ${uploadProgress.total})`
+                      : importPhase === "saving"
+                        ? "جاري حفظ الأسئلة..."
+                        : "جاري الاستيراد..."}
                   </>
                 ) : (
                   <>
