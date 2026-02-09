@@ -1,36 +1,44 @@
 
 
-# إصلاح أزرار التحكم في إظهار الأسئلة (Switch)
+# إصلاح أزرار التبديل (Switch) في بنك الأسئلة
 
-## المشكلة
-- أزرار التبديل (Switch) للأسئلة النصية معطّلة ولا يمكن تحريكها
-- السبب: جدول `text_question_bank` لا يحتوي على عمود `visible_to_students`، والقيمة مثبتة على `true` في الـ VIEW
+## المشكلة الجذرية
+
+بعد مراجعة الكود والبيانات، وجدت مشكلتين:
+
+### 1. صلاحيات قاعدة البيانات (السبب الرئيسي)
+سياسة التحديث على جدول `text_question_bank` تسمح فقط لـ **مدير النظام** بالتعديل. عندما تنقر المعلمة على زر التبديل لسؤال نصي، يفشل التحديث بصمت ولا يتغير شيء -- مما يعطي انطباعاً بأن الزر لا يعمل.
+
+### 2. عدم وجود معالجة للأخطاء
+الكود لا يتحقق من نجاح عملية التحديث، فلا تظهر رسالة خطأ عند الفشل.
 
 ## الحل
 
-### 1. إضافة عمود `visible_to_students` لجدول الأسئلة النصية
-- إضافة عمود `visible_to_students` من نوع `boolean` بقيمة افتراضية `true` إلى جدول `text_question_bank`
+### الخطوة 1: تحديث سياسة RLS
+إضافة سياسة تحديث جديدة تسمح للمعلمات بتحديث عمود `visible_to_students` فقط في جدول `text_question_bank`:
 
-### 2. تحديث الـ VIEW
-- تعديل `teacher_question_bank_view` لقراءة القيمة الفعلية من العمود الجديد بدلاً من القيمة الثابتة `true`
+```text
+-- السماح للمعلمات بتحديث visible_to_students في الأسئلة النصية
+CREATE POLICY "teachers_update_visibility"
+ON public.text_question_bank
+FOR UPDATE
+USING (is_teacher())
+WITH CHECK (is_teacher());
+```
 
-### 3. تحديث صفحة بنك الأسئلة
-- إزالة `disabled={q.source === 'text'}` من زر التبديل
-- السماح بتبديل إظهار/إخفاء جميع الأسئلة (صورية ونصية)
-- إزالة رسالة "الأسئلة النصية مرئية دائماً" والسماح بالتبديل الفعلي
+### الخطوة 2: تحسين معالجة الأخطاء في الواجهة
+تعديل `handleToggleVisibility` في `QuestionBank.tsx` لعرض رسالة خطأ واضحة عند فشل التحديث وتحديث الحالة المحلية فوراً (optimistic update) لتجربة مستخدم أسرع.
+
+### الخطوة 3: ضمان تنسيق موحد
+التأكد من أن خلية الجدول التي تحتوي على Switch لا تتأثر بمحتوى الخلايا الأخرى، بإضافة عرض ثابت لعمود التبديل.
 
 ## التفاصيل التقنية
 
 **Migration SQL:**
-```text
-ALTER TABLE public.text_question_bank 
-  ADD COLUMN visible_to_students boolean DEFAULT true NOT NULL;
-
--- إعادة إنشاء الـ VIEW لاستخدام العمود الجديد
-CREATE OR REPLACE VIEW public.teacher_question_bank_view AS ...
-  (تحديث السطر الخاص بالأسئلة النصية من true إلى visible_to_students)
-```
+- إضافة سياسة UPDATE للمعلمات على `text_question_bank` (مقيّدة بـ `is_teacher()`)
 
 **تعديل QuestionBank.tsx:**
-- إزالة شرط `q.source === 'text'` من `disabled`
-- تعديل `handleToggleVisibility` للسماح بتحديث كلا الجدولين
+- إضافة `const { error }` للتحقق من نتيجة التحديث
+- عرض toast خطأ عند الفشل
+- إضافة `className="w-[60px]"` لعمود التبديل لضمان محاذاة ثابتة
+
