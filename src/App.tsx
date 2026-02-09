@@ -21,6 +21,7 @@ import TakeExam from "./pages/student/TakeExam";
 import SubmissionConfirmation from "./pages/student/SubmissionConfirmation";
 import SystemDashboard from "./pages/system/SystemDashboard";
 import ImportQuestionBank from "./pages/system/ImportQuestionBank";
+import ImportTextQuestions from "./pages/system/ImportTextQuestions";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -52,6 +53,7 @@ const App = () => (
             {/* System Admin Routes */}
             <Route path="/system" element={<ProtectedRoute requiredRole="system_admin"><SystemDashboard /></ProtectedRoute>} />
             <Route path="/system/import" element={<ProtectedRoute requiredRole="system_admin"><ImportQuestionBank /></ProtectedRoute>} />
+            <Route path="/system/import-text" element={<ProtectedRoute requiredRole="system_admin"><ImportTextQuestions /></ProtectedRoute>} />
             
             {/* Student Routes (no auth needed) */}
             <Route path="/student" element={<StudentEntry />} />

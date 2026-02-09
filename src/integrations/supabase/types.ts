@@ -280,6 +280,63 @@ export type Database = {
           },
         ]
       }
+      text_question_bank: {
+        Row: {
+          correct_answer: string
+          correct_answer_text: string | null
+          created_at: string
+          grade: string
+          id: string
+          imported_by: string
+          notes: string | null
+          option_a: string
+          option_b: string
+          option_c: string
+          option_d: string
+          question_number: number
+          question_text: string
+          question_type: string
+          semester: string
+          subject: string
+        }
+        Insert: {
+          correct_answer: string
+          correct_answer_text?: string | null
+          created_at?: string
+          grade: string
+          id?: string
+          imported_by: string
+          notes?: string | null
+          option_a: string
+          option_b: string
+          option_c: string
+          option_d: string
+          question_number: number
+          question_text: string
+          question_type?: string
+          semester: string
+          subject?: string
+        }
+        Update: {
+          correct_answer?: string
+          correct_answer_text?: string | null
+          created_at?: string
+          grade?: string
+          id?: string
+          imported_by?: string
+          notes?: string | null
+          option_a?: string
+          option_b?: string
+          option_c?: string
+          option_d?: string
+          question_number?: number
+          question_text?: string
+          question_type?: string
+          semester?: string
+          subject?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
