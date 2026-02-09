@@ -7,27 +7,83 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { GraduationCap } from "lucide-react";
+import { GraduationCap, ArrowRight } from "lucide-react";
+
+interface AvailableExam {
+  id: string;
+  exam_name: string;
+}
+
+const SUBJECTS = ["رياضيات", "علوم", "لغة عربية"];
 
 const StudentEntry = () => {
   const [studentName, setStudentName] = useState("");
   const [classNumber, setClassNumber] = useState("");
-  const [examCode, setExamCode] = useState("");
+  const [subject, setSubject] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [availableExams, setAvailableExams] = useState<AvailableExam[] | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!studentName.trim() || !classNumber || !examCode.trim()) return;
+    if (!studentName.trim() || !classNumber || !subject) return;
 
+    setIsLoading(true);
+    setAvailableExams(null);
+
+    try {
+      const { data, error } = await supabase.functions.invoke("student-exam-access", {
+        body: {
+          studentName: studentName.trim(),
+          classNumber: parseInt(classNumber),
+          subject,
+        },
+      });
+
+      if (error || data?.error) {
+        toast({
+          title: "تنبيه",
+          description: data?.error || "لا يمكن الوصول للاختبار",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Single exam: navigate directly
+      if (data.examId) {
+        navigate("/student/exam", {
+          state: {
+            examId: data.examId,
+            examName: data.examName,
+            studentName: studentName.trim(),
+            classNumber: parseInt(classNumber),
+            questions: data.questions,
+          },
+        });
+        return;
+      }
+
+      // Multiple exams: show selection
+      if (data.exams?.length) {
+        setAvailableExams(data.exams);
+      }
+    } catch {
+      toast({ title: "حدث خطأ", variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleExamSelect = async (examId: string) => {
     setIsLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("student-exam-access", {
         body: {
           studentName: studentName.trim(),
           classNumber: parseInt(classNumber),
-          examCode: examCode.trim(),
+          subject,
+          examId,
         },
       });
 
@@ -40,7 +96,6 @@ const StudentEntry = () => {
         return;
       }
 
-      // Navigate to exam with data
       navigate("/student/exam", {
         state: {
           examId: data.examId,
@@ -56,6 +111,44 @@ const StudentEntry = () => {
       setIsLoading(false);
     }
   };
+
+  // Show exam selection view
+  if (availableExams) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+        <div className="w-full max-w-md">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary text-primary-foreground mb-4">
+              <GraduationCap className="h-8 w-8" />
+            </div>
+            <h1 className="text-3xl font-bold text-foreground">اختر الاختبار</h1>
+            <p className="text-muted-foreground mt-2">يوجد أكثر من اختبار متاح، اختاري واحدًا</p>
+          </div>
+
+          <div className="space-y-3">
+            {availableExams.map((exam) => (
+              <Card
+                key={exam.id}
+                className="cursor-pointer hover:border-primary transition-colors shadow-sm"
+                onClick={() => handleExamSelect(exam.id)}
+              >
+                <CardContent className="flex items-center justify-between p-5">
+                  <span className="font-medium text-lg">{exam.exam_name}</span>
+                  <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <div className="text-center mt-6">
+            <Button variant="outline" onClick={() => setAvailableExams(null)} disabled={isLoading}>
+              {isLoading ? "جاري التحميل..." : "رجوع"}
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
@@ -101,18 +194,23 @@ const StudentEntry = () => {
               </div>
 
               <div className="space-y-2">
-                <Label>رمز الاختبار</Label>
-                <Input
-                  value={examCode}
-                  onChange={(e) => setExamCode(e.target.value)}
-                  placeholder="مثال: رياضيات-101"
-                  required
-                  dir="rtl"
-                />
+                <Label>المادة</Label>
+                <Select value={subject} onValueChange={setSubject}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="اختاري المادة" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SUBJECTS.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {s}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "جاري التحقق..." : "دخول الاختبار"}
+              <Button type="submit" className="w-full" disabled={isLoading || !studentName.trim() || !classNumber || !subject}>
+                {isLoading ? "جاري البحث..." : "دخول الاختبار"}
               </Button>
             </form>
           </CardContent>
