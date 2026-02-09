@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.import-question-bank]
 verify_jwt = false
+
+[functions.import-text-questions]
+verify_jwt = false

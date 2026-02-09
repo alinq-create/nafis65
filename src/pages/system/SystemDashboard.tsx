@@ -1,7 +1,7 @@
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
-import { Upload, Settings } from "lucide-react";
+import { Upload, FileText } from "lucide-react";
 
 const SystemDashboard = () => {
   const navigate = useNavigate();
@@ -12,6 +12,12 @@ const SystemDashboard = () => {
       description: "رفع ملف إكسل وصور الصفحات لاستيراد الأسئلة",
       icon: Upload,
       path: "/system/import",
+    },
+    {
+      title: "استيراد الأسئلة النصية",
+      description: "رفع ملف إكسل لاستيراد أسئلة اختيار من متعدد نصية",
+      icon: FileText,
+      path: "/system/import-text",
     },
   ];
 
