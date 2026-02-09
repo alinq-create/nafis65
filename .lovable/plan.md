@@ -1,68 +1,27 @@
 
 
-# إنشاء نظام الاختبارات للمعلمات
+# إزالة قيد Foreign Key من exam_questions
 
-## الوضع الحالي
-- صفحة `CreateExam.tsx` موجودة بالفعل في `/teacher/exams` وتعمل كصفحة شاملة (إنشاء + قائمة) لكنها تعتمد فقط على `question_bank` (الأسئلة الصورية)
-- جدول `exam_questions` لا يحتوي على عمود `source_type` لتمييز مصدر السؤال
-- بنك الأسئلة الموحد متاح عبر دالة `get_teacher_questions` التي تدمج النوعين
+## المشكلة
+جدول `exam_questions` يحتوي على قيد `exam_questions_question_id_fkey` مربوط بجدول `question_bank` فقط. عند إدراج سؤال نصي من `text_question_bank`، يفشل الإدراج بسبب عدم وجود الـ ID في `question_bank`.
 
-## التغييرات المطلوبة
+## الحل
+تعديل واحد فقط في قاعدة البيانات:
 
-### 1. تعديل قاعدة البيانات (Migration)
-إضافة عمود `source_type` لجدول `exam_questions`:
+### Migration SQL
 ```text
-ALTER TABLE public.exam_questions 
-ADD COLUMN source_type text NOT NULL DEFAULT 'image';
+ALTER TABLE public.exam_questions
+DROP CONSTRAINT exam_questions_question_id_fkey;
 ```
 
-### 2. إعادة كتابة صفحة CreateExam.tsx بالكامل
-تقسيم التجربة إلى خطوتين داخل نفس الصفحة (بدون Dialog):
+هذا يزيل القيد مع الإبقاء على:
+- عمود `question_id` كما هو
+- عمود `source_type` للتمييز بين المصادر
+- قيد `exam_questions_exam_id_fkey` (الربط بجدول exams) بدون تغيير
 
-**الخطوة 1 - بيانات الاختبار:**
-- حقل اسم الاختبار
-- المادة (معروضة تلقائياً ومقفلة)
-- اختيار الفصول المستهدفة (Checkbox من صلاحيات المعلمة)
-- زر "التالي" ينتقل للخطوة 2
+### التحقق في الكود
+الكود الحالي في `CreateNewExam.tsx` يحدد `source_type` تلقائيا من حقل `source` في البيانات المجلوبة من `get_teacher_questions`، فلا حاجة لتعديل أي ملف.
 
-**الخطوة 2 - اختيار الأسئلة:**
-- جلب الأسئلة من `get_teacher_questions` (نفس بنك الأسئلة الموحد)
-- عرض فقط الأسئلة التي `visible_to_students = true`
-- جدول موحد بنفس تصميم بنك الأسئلة مع إضافة عمود Checkbox
-- عداد أعلى الجدول: "عدد الأسئلة المختارة: X"
-- زر "حفظ الاختبار" يحفظ كمسودة
-
-**عند الحفظ:**
-- إنشاء سجل في `exams` بحالة "مسودة"
-- إنشاء سجلات في `exam_questions` مع `source_type` ('image' أو 'text')
-- رسالة نجاح ثم العودة لقائمة الاختبارات
-
-### 3. الإبقاء على قائمة الاختبارات
-الجزء السفلي من الصفحة يبقى كما هو (جدول الاختبارات الموجودة مع أزرار النشر والإغلاق).
-
-## التفاصيل التقنية
-
-**الملفات المعدلة:**
-- `src/pages/teacher/CreateExam.tsx` - إعادة كتابة لدعم الأسئلة الموحدة والخطوتين
-- `src/integrations/supabase/types.ts` - يتحدث تلقائياً بعد Migration
-
-**Migration SQL:**
-```text
-ALTER TABLE public.exam_questions 
-ADD COLUMN source_type text NOT NULL DEFAULT 'image';
-```
-
-**منطق جلب الأسئلة:**
-- استخدام `supabase.rpc('get_teacher_questions', { p_subject })` بدلاً من الاستعلام المباشر على `question_bank`
-- فلترة `visible_to_students = true` في الواجهة
-
-**منطق الحفظ:**
-```text
-1. إنشاء exam في جدول exams (status = 'مسودة')
-2. لكل سؤال مختار: إنشاء سجل في exam_questions مع:
-   - exam_id
-   - question_id (id السؤال)
-   - source_type ('image' أو 'text' من حقل source)
-   - question_order (ترتيب الاختيار)
-```
+### ملاحظة
+لا يوجد تعديل على أي ملف كود - فقط تعديل على بنية قاعدة البيانات.
 
