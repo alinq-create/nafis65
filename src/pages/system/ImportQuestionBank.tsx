@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import DashboardLayout from "@/components/layout/DashboardLayout";
@@ -7,8 +7,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, FileSpreadsheet, ImageIcon, Play, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Upload, FileSpreadsheet, ImageIcon, Play, CheckCircle2, AlertTriangle, Ban } from "lucide-react";
 import * as XLSX from "xlsx";
+
+/* ─── Types ─── */
 
 interface ParsedQuestion {
   page_number: number;
@@ -20,14 +22,87 @@ interface ParsedQuestion {
   frame_width: number;
   frame_height: number;
   correct_answer: string;
+  visible_to_students: boolean;
   notes: string | null;
+  subject: string;
+  image_missing?: boolean;
 }
 
 interface ImportReport {
   importedCount: number;
+  skippedCount: number;
   uploadedImages: number;
   missingImages: string[];
 }
+
+/* ─── Column normalisation helpers ─── */
+
+/** Normalise Arabic column name: strip diacritics, unify hamza, replace _ with space, remove ?, trim */
+function normalizeColumnName(raw: string): string {
+  let s = raw.trim();
+  // Replace underscores with spaces
+  s = s.replace(/_/g, " ");
+  // Remove Arabic diacritics (tashkeel)
+  s = s.replace(/[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E4\u06E7\u06E8\u06EA-\u06ED]/g, "");
+  // Unify hamza forms to bare alef / ya / waw
+  s = s.replace(/[أإآٱ]/g, "ا");
+  s = s.replace(/[ؤ]/g, "و");
+  s = s.replace(/[ئ]/g, "ي");
+  // Remove question marks (Arabic & Latin)
+  s = s.replace(/[؟?]/g, "");
+  // Collapse whitespace
+  s = s.replace(/\s+/g, " ").trim();
+  return s;
+}
+
+/** Known column mapping: normalised Arabic name → internal field */
+const COLUMN_MAP: Record<string, keyof ParsedQuestion> = {
+  "رقم الصفحة": "page_number",
+  "رقم السوال": "question_number",
+  "نوع السوال": "question_type",
+  "اسم صورة الصفحة الكاملة": "page_image_name",
+  "اعلى الاطار": "frame_top",
+  "يسار الاطار": "frame_left",
+  "عرض الاطار": "frame_width",
+  "ارتفاع الاطار": "frame_height",
+  "الاجابة الصحيحة": "correct_answer",
+  "يظهر للطالبات": "visible_to_students",
+  "ملاحظات": "notes",
+  "المادة": "subject",
+};
+
+/** Build a dynamic mapping from actual Excel header names to internal field names */
+function buildHeaderMapping(headers: string[]): Record<string, keyof ParsedQuestion> {
+  const mapping: Record<string, keyof ParsedQuestion> = {};
+  for (const header of headers) {
+    const normalised = normalizeColumnName(header);
+    if (COLUMN_MAP[normalised]) {
+      mapping[header] = COLUMN_MAP[normalised];
+    }
+  }
+  return mapping;
+}
+
+/** Convert question type: "اختيار من متعدد" → "اختيار متعدد", anything else → "إدخال" */
+function convertQuestionType(raw: string | undefined): string {
+  if (!raw) return "اختيار متعدد";
+  const normalised = normalizeColumnName(raw);
+  if (normalised.includes("اختيار") && normalised.includes("متعدد")) {
+    return "اختيار متعدد";
+  }
+  return "إدخال";
+}
+
+/** Convert visible to students: نعم/true/1 → true, anything else → false. Default true. */
+function convertVisibility(raw: any): boolean {
+  if (raw === undefined || raw === null || raw === "") return true;
+  const s = String(raw).trim().toLowerCase();
+  if (["نعم", "true", "1"].includes(s)) return true;
+  if (["لا", "false", "0"].includes(s)) return false;
+  return true;
+}
+
+/* ─── Component ─── */
 
 const ImportQuestionBank = () => {
   const { authUser } = useAuth();
@@ -44,6 +119,29 @@ const ImportQuestionBank = () => {
   const excelInputRef = useRef<HTMLInputElement>(null);
   const imagesInputRef = useRef<HTMLInputElement>(null);
 
+  /** Set of uploaded image file names for quick lookup */
+  const uploadedImageNames = useMemo(
+    () => new Set(imageFiles.map((f) => f.name)),
+    [imageFiles]
+  );
+
+  /** Count of questions with missing images */
+  const missingImageCount = useMemo(
+    () => parsedQuestions.filter((q) => q.image_missing).length,
+    [parsedQuestions]
+  );
+
+  /** Re-check image_missing flags whenever imageFiles or parsedQuestions change */
+  const questionsWithImageCheck = useMemo(() => {
+    if (parsedQuestions.length === 0) return parsedQuestions;
+    return parsedQuestions.map((q) => ({
+      ...q,
+      image_missing: q.page_image_name ? !uploadedImageNames.has(q.page_image_name) : true,
+    }));
+  }, [parsedQuestions, uploadedImageNames]);
+
+  /* ─── Excel parsing ─── */
+
   const handleExcelSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -53,20 +151,40 @@ const ImportQuestionBank = () => {
       const data = await file.arrayBuffer();
       const workbook = XLSX.read(data);
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json<any>(sheet);
+      const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet);
 
-      const questions: ParsedQuestion[] = rows.map((row: any) => ({
-        page_number: Number(row["رقم_الصفحة"]) || 0,
-        question_number: Number(row["رقم_السؤال"]) || 0,
-        question_type: row["نوع_السؤال"] || "اختيار متعدد",
-        page_image_name: String(row["اسم_صورة_الصفحة"] || "").trim(),
-        frame_top: Number(row["إطار_أعلى"]) || 0,
-        frame_left: Number(row["إطار_يسار"]) || 0,
-        frame_width: Number(row["عرض_الإطار"]) || 1,
-        frame_height: Number(row["ارتفاع_الإطار"]) || 1,
-        correct_answer: String(row["الإجابة_الصحيحة"] || ""),
-        notes: row["ملاحظات"] ? String(row["ملاحظات"]) : null,
-      }));
+      if (rows.length === 0) {
+        toast({ title: "الملف فارغ", description: "لا توجد بيانات في الملف", variant: "destructive" });
+        return;
+      }
+
+      // Build dynamic header mapping from actual Excel headers
+      const excelHeaders = Object.keys(rows[0]);
+      const headerMap = buildHeaderMapping(excelHeaders);
+
+      const questions: ParsedQuestion[] = rows.map((row) => {
+        // Build a mapped row using the dynamic header mapping
+        const mapped: Record<string, any> = {};
+        for (const [excelCol, fieldName] of Object.entries(headerMap)) {
+          mapped[fieldName] = row[excelCol];
+        }
+
+        return {
+          page_number: Number(mapped.page_number) || 0,
+          question_number: Number(mapped.question_number) || 0,
+          question_type: convertQuestionType(mapped.question_type as string),
+          page_image_name: String(mapped.page_image_name || "").trim(),
+          frame_top: Number(mapped.frame_top) || 0,
+          frame_left: Number(mapped.frame_left) || 0,
+          frame_width: Number(mapped.frame_width) || 0,
+          frame_height: Number(mapped.frame_height) || 0,
+          correct_answer: String(mapped.correct_answer ?? ""),
+          visible_to_students: convertVisibility(mapped.visible_to_students),
+          notes: mapped.notes ? String(mapped.notes) : null,
+          subject: mapped.subject ? String(mapped.subject).trim() : "رياضيات",
+          image_missing: false, // will be recalculated via useMemo
+        };
+      });
 
       setParsedQuestions(questions);
       setReport(null);
@@ -85,6 +203,8 @@ const ImportQuestionBank = () => {
     }
   };
 
+  /* ─── Image selection ─── */
+
   const handleImagesSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     setImageFiles(files);
@@ -94,8 +214,10 @@ const ImportQuestionBank = () => {
     });
   };
 
+  /* ─── Import ─── */
+
   const handleImport = async () => {
-    if (!authUser || parsedQuestions.length === 0) return;
+    if (!authUser || questionsWithImageCheck.length === 0) return;
 
     setImporting(true);
     const missingImages: string[] = [];
@@ -104,7 +226,7 @@ const ImportQuestionBank = () => {
     try {
       // 1. Upload images to storage
       const imageFileMap = new Map(imageFiles.map((f) => [f.name, f]));
-      const uniqueImageNames = [...new Set(parsedQuestions.map((q) => q.page_image_name))];
+      const uniqueImageNames = [...new Set(questionsWithImageCheck.map((q) => q.page_image_name).filter(Boolean))];
 
       for (const imageName of uniqueImageNames) {
         const imageFile = imageFileMap.get(imageName);
@@ -125,18 +247,20 @@ const ImportQuestionBank = () => {
         }
       }
 
-      // 2. Import questions via edge function
+      // 2. Import questions via edge function (strip image_missing before sending)
+      const questionsPayload = questionsWithImageCheck.map(
+        ({ image_missing, ...rest }) => rest
+      );
+
       const { data, error } = await supabase.functions.invoke("import-question-bank", {
-        body: {
-          questions: parsedQuestions,
-          subject: "رياضيات",
-        },
+        body: { questions: questionsPayload },
       });
 
       if (error) throw error;
 
       const importReport: ImportReport = {
         importedCount: data?.importedCount || 0,
+        skippedCount: data?.skippedCount || 0,
         uploadedImages,
         missingImages,
       };
@@ -158,7 +282,7 @@ const ImportQuestionBank = () => {
 
       toast({
         title: "تم الاستيراد بنجاح",
-        description: `${importReport.importedCount} سؤال، ${uploadedImages} صورة`,
+        description: `${importReport.importedCount} سؤال جديد${importReport.skippedCount > 0 ? `، ${importReport.skippedCount} مكرر تم تخطيه` : ""}`,
       });
     } catch (err: any) {
       toast({
@@ -255,10 +379,10 @@ const ImportQuestionBank = () => {
         )}
 
         {/* Preview parsed data before import */}
-        {parsedQuestions.length > 0 && !report && (
+        {questionsWithImageCheck.length > 0 && !report && (
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>معاينة البيانات المقروءة ({parsedQuestions.length} سؤال)</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-4">
+              <CardTitle>معاينة البيانات المقروءة ({questionsWithImageCheck.length} سؤال)</CardTitle>
               <Button onClick={handleImport} disabled={importing}>
                 {importing ? (
                   <>
@@ -274,6 +398,16 @@ const ImportQuestionBank = () => {
               </Button>
             </CardHeader>
             <CardContent>
+              {/* Missing images warning */}
+              {missingImageCount > 0 && (
+                <div className="mb-4 p-3 rounded-lg bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-yellow-600 shrink-0" />
+                  <span className="text-sm font-medium">
+                    {missingImageCount} صورة مفقودة من بين الصور المرفوعة — سيتم تمييزها بالتحذير أدناه
+                  </span>
+                </div>
+              )}
+
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
@@ -282,12 +416,12 @@ const ImportQuestionBank = () => {
                       <TableHead className="text-right">رقم السؤال</TableHead>
                       <TableHead className="text-right">النوع</TableHead>
                       <TableHead className="text-right">اسم الصورة</TableHead>
+                      <TableHead className="text-right">الإطار (أعلى، يسار، عرض، ارتفاع)</TableHead>
                       <TableHead className="text-right">الإجابة</TableHead>
-                      <TableHead className="text-right">إطار (أعلى، يسار، عرض، ارتفاع)</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {parsedQuestions.slice(0, 20).map((q, i) => (
+                    {questionsWithImageCheck.slice(0, 30).map((q, i) => (
                       <TableRow key={i}>
                         <TableCell>{q.page_number}</TableCell>
                         <TableCell>{q.question_number}</TableCell>
@@ -295,20 +429,25 @@ const ImportQuestionBank = () => {
                           <Badge variant="secondary">{q.question_type}</Badge>
                         </TableCell>
                         <TableCell className="text-xs max-w-[200px] truncate">
-                          {q.page_image_name}
+                          <div className="flex items-center gap-1">
+                            {q.image_missing && (
+                              <AlertTriangle className="h-4 w-4 text-yellow-500 shrink-0" />
+                            )}
+                            <span>{q.page_image_name || "—"}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-xs font-mono" dir="ltr">
+                          {q.frame_top.toFixed(3)}, {q.frame_left.toFixed(3)},{" "}
+                          {q.frame_width.toFixed(3)}, {q.frame_height.toFixed(3)}
                         </TableCell>
                         <TableCell className="font-medium">{q.correct_answer}</TableCell>
-                        <TableCell className="text-xs">
-                          {q.frame_top.toFixed(2)}, {q.frame_left.toFixed(2)},{" "}
-                          {q.frame_width.toFixed(2)}, {q.frame_height.toFixed(2)}
-                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
-                {parsedQuestions.length > 20 && (
+                {questionsWithImageCheck.length > 30 && (
                   <p className="text-sm text-muted-foreground text-center py-2">
-                    ... و {parsedQuestions.length - 20} سؤال آخر
+                    ... و {questionsWithImageCheck.length - 30} سؤال آخر
                   </p>
                 )}
               </div>
@@ -327,7 +466,7 @@ const ImportQuestionBank = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="p-4 rounded-lg bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800">
                     <p className="text-sm text-muted-foreground">الأسئلة المستوردة</p>
                     <p className="text-2xl font-bold text-green-700 dark:text-green-400">
@@ -340,6 +479,17 @@ const ImportQuestionBank = () => {
                       {report.uploadedImages}
                     </p>
                   </div>
+                  {report.skippedCount > 0 && (
+                    <div className="p-4 rounded-lg bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800">
+                      <p className="text-sm text-muted-foreground flex items-center gap-1">
+                        <Ban className="h-4 w-4" />
+                        أسئلة مكررة (تم تخطيها)
+                      </p>
+                      <p className="text-2xl font-bold text-orange-700 dark:text-orange-400">
+                        {report.skippedCount}
+                      </p>
+                    </div>
+                  )}
                   {report.missingImages.length > 0 && (
                     <div className="p-4 rounded-lg bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800">
                       <p className="text-sm text-muted-foreground">صور مفقودة</p>
@@ -376,7 +526,7 @@ const ImportQuestionBank = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {parsedQuestions.map((q, i) => {
+                    {questionsWithImageCheck.slice(0, 30).map((q, i) => {
                       const imgUrl = imageUrls[q.page_image_name];
                       return (
                         <div
