@@ -9,10 +9,13 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import Login from "./pages/Login";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import ManageTeachers from "./pages/admin/ManageTeachers";
+import AdminAttempts from "./pages/admin/AdminAttempts";
+import AdminAnalytics from "./pages/admin/AdminAnalytics";
 import TeacherDashboard from "./pages/teacher/TeacherDashboard";
 import QuestionBank from "./pages/teacher/QuestionBank";
 import CreateExam from "./pages/teacher/CreateExam";
 import ReviewAttempts from "./pages/teacher/ReviewAttempts";
+import TeacherAnalytics from "./pages/teacher/TeacherAnalytics";
 import StudentEntry from "./pages/student/StudentEntry";
 import TakeExam from "./pages/student/TakeExam";
 import SubmissionConfirmation from "./pages/student/SubmissionConfirmation";
@@ -34,12 +37,15 @@ const App = () => (
             {/* Admin Routes */}
             <Route path="/admin" element={<ProtectedRoute requiredRole="admin"><AdminDashboard /></ProtectedRoute>} />
             <Route path="/admin/teachers" element={<ProtectedRoute requiredRole="admin"><ManageTeachers /></ProtectedRoute>} />
+            <Route path="/admin/attempts" element={<ProtectedRoute requiredRole="admin"><AdminAttempts /></ProtectedRoute>} />
+            <Route path="/admin/analytics" element={<ProtectedRoute requiredRole="admin"><AdminAnalytics /></ProtectedRoute>} />
             
             {/* Teacher Routes */}
             <Route path="/teacher" element={<ProtectedRoute requiredRole="teacher"><TeacherDashboard /></ProtectedRoute>} />
             <Route path="/teacher/questions" element={<ProtectedRoute requiredRole="teacher"><QuestionBank /></ProtectedRoute>} />
             <Route path="/teacher/exams" element={<ProtectedRoute requiredRole="teacher"><CreateExam /></ProtectedRoute>} />
             <Route path="/teacher/attempts" element={<ProtectedRoute requiredRole="teacher"><ReviewAttempts /></ProtectedRoute>} />
+            <Route path="/teacher/analytics" element={<ProtectedRoute requiredRole="teacher"><TeacherAnalytics /></ProtectedRoute>} />
             
             {/* Student Routes (no auth needed) */}
             <Route path="/student" element={<StudentEntry />} />

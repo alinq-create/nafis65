@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle, Eye } from "lucide-react";
 
@@ -46,7 +47,6 @@ const ReviewAttempts = () => {
   const fetchAttempts = async () => {
     if (!authUser) return;
 
-    // Get teacher's exams
     const { data: exams } = await supabase
       .from("exams")
       .select("id, exam_name, exam_code")
@@ -80,7 +80,6 @@ const ReviewAttempts = () => {
     setSelectedAttempt(attempt);
     setAdjustedScore(String(attempt.approved_score ?? attempt.auto_score ?? 0));
 
-    // Fetch answers with question details
     const { data: answersData } = await supabase
       .from("student_answers")
       .select("id, question_id, student_answer, auto_correct")
@@ -137,6 +136,60 @@ const ReviewAttempts = () => {
     }
   };
 
+  const pendingAttempts = attempts.filter((a) => a.status === "بانتظار الاعتماد");
+  const approvedAttempts = attempts.filter((a) => a.status === "معتمد");
+
+  const renderAttemptsTable = (items: AttemptWithExam[], showApproveAction: boolean) => {
+    if (items.length === 0) {
+      return <p className="text-center text-muted-foreground py-8">لا توجد محاولات</p>;
+    }
+
+    return (
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="text-right">الطالبة</TableHead>
+            <TableHead className="text-right">الفصل</TableHead>
+            <TableHead className="text-right">الاختبار</TableHead>
+            <TableHead className="text-right">الدرجة الآلية</TableHead>
+            <TableHead className="text-right">الدرجة المعتمدة</TableHead>
+            <TableHead className="text-right">الحالة</TableHead>
+            <TableHead className="text-right">إجراءات</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {items.map((attempt) => (
+            <TableRow key={attempt.id}>
+              <TableCell className="font-medium">{attempt.student_name}</TableCell>
+              <TableCell>{attempt.class_number}</TableCell>
+              <TableCell>{attempt.exam_name}</TableCell>
+              <TableCell>{attempt.auto_score ?? "—"}</TableCell>
+              <TableCell>{attempt.approved_score ?? "—"}</TableCell>
+              <TableCell>
+                <Badge
+                  variant={attempt.status === "معتمد" ? "default" : "secondary"}
+                  className={attempt.status === "معتمد" ? "bg-success text-success-foreground" : ""}
+                >
+                  {attempt.status}
+                </Badge>
+              </TableCell>
+              <TableCell>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleViewAttempt(attempt)}
+                >
+                  <Eye className="h-4 w-4 ml-1" />
+                  عرض
+                </Button>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    );
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -182,80 +235,61 @@ const ReviewAttempts = () => {
                 </TableBody>
               </Table>
 
-              <div className="flex items-center gap-4 pt-4 border-t">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">الدرجة:</span>
-                  <Input
-                    type="number"
-                    value={adjustedScore}
-                    onChange={(e) => setAdjustedScore(e.target.value)}
-                    className="w-24"
-                    dir="ltr"
-                  />
-                  <span className="text-muted-foreground">من {answers.length}</span>
+              {selectedAttempt?.status !== "معتمد" && (
+                <div className="flex items-center gap-4 pt-4 border-t">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">الدرجة:</span>
+                    <Input
+                      type="number"
+                      value={adjustedScore}
+                      onChange={(e) => setAdjustedScore(e.target.value)}
+                      className="w-24"
+                      dir="ltr"
+                    />
+                    <span className="text-muted-foreground">من {answers.length}</span>
+                  </div>
+                  <Button onClick={handleApprove} disabled={isSubmitting}>
+                    <CheckCircle className="h-4 w-4 ml-2" />
+                    {isSubmitting ? "جاري الاعتماد..." : "اعتماد النتيجة"}
+                  </Button>
                 </div>
-                <Button onClick={handleApprove} disabled={isSubmitting}>
-                  <CheckCircle className="h-4 w-4 ml-2" />
-                  {isSubmitting ? "جاري الاعتماد..." : "اعتماد النتيجة"}
-                </Button>
-              </div>
+              )}
             </div>
           </DialogContent>
         </Dialog>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>المحاولات</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {attempts.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">لا توجد محاولات</p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-right">الطالبة</TableHead>
-                    <TableHead className="text-right">الفصل</TableHead>
-                    <TableHead className="text-right">الاختبار</TableHead>
-                    <TableHead className="text-right">الدرجة الآلية</TableHead>
-                    <TableHead className="text-right">الدرجة المعتمدة</TableHead>
-                    <TableHead className="text-right">الحالة</TableHead>
-                    <TableHead className="text-right">إجراءات</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {attempts.map((attempt) => (
-                    <TableRow key={attempt.id}>
-                      <TableCell className="font-medium">{attempt.student_name}</TableCell>
-                      <TableCell>{attempt.class_number}</TableCell>
-                      <TableCell>{attempt.exam_name}</TableCell>
-                      <TableCell>{attempt.auto_score ?? "—"}</TableCell>
-                      <TableCell>{attempt.approved_score ?? "—"}</TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={attempt.status === "معتمد" ? "default" : "secondary"}
-                          className={attempt.status === "معتمد" ? "bg-success text-success-foreground" : ""}
-                        >
-                          {attempt.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleViewAttempt(attempt)}
-                        >
-                          <Eye className="h-4 w-4 ml-1" />
-                          عرض
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+        <Tabs defaultValue="pending" dir="rtl">
+          <TabsList>
+            <TabsTrigger value="pending">
+              بانتظار الاعتماد ({pendingAttempts.length})
+            </TabsTrigger>
+            <TabsTrigger value="approved">
+              معتمدة ({approvedAttempts.length})
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="pending">
+            <Card>
+              <CardHeader>
+                <CardTitle>المحاولات بانتظار الاعتماد</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {renderAttemptsTable(pendingAttempts, true)}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="approved">
+            <Card>
+              <CardHeader>
+                <CardTitle>المحاولات المعتمدة</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {renderAttemptsTable(approvedAttempts, false)}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </DashboardLayout>
   );
