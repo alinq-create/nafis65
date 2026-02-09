@@ -14,6 +14,7 @@ import AdminAnalytics from "./pages/admin/AdminAnalytics";
 import TeacherDashboard from "./pages/teacher/TeacherDashboard";
 import QuestionBank from "./pages/teacher/QuestionBank";
 import CreateExam from "./pages/teacher/CreateExam";
+import CreateNewExam from "./pages/teacher/CreateNewExam";
 import ReviewAttempts from "./pages/teacher/ReviewAttempts";
 import TeacherAnalytics from "./pages/teacher/TeacherAnalytics";
 import StudentEntry from "./pages/student/StudentEntry";
@@ -47,6 +48,7 @@ const App = () => (
             <Route path="/teacher" element={<ProtectedRoute requiredRole="teacher"><TeacherDashboard /></ProtectedRoute>} />
             <Route path="/teacher/questions" element={<ProtectedRoute requiredRole="teacher"><QuestionBank /></ProtectedRoute>} />
             <Route path="/teacher/exams" element={<ProtectedRoute requiredRole="teacher"><CreateExam /></ProtectedRoute>} />
+            <Route path="/teacher/create-exam" element={<ProtectedRoute requiredRole="teacher"><CreateNewExam /></ProtectedRoute>} />
             <Route path="/teacher/attempts" element={<ProtectedRoute requiredRole="teacher"><ReviewAttempts /></ProtectedRoute>} />
             <Route path="/teacher/analytics" element={<ProtectedRoute requiredRole="teacher"><TeacherAnalytics /></ProtectedRoute>} />
             
