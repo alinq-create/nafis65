@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User } from "@supabase/supabase-js";
 
@@ -27,17 +27,17 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const isMounted = useRef(true);
+  const initialLoadDone = useRef(false);
 
-  const fetchUserData = async (user: User) => {
+  const fetchUserData = async (user: User): Promise<AuthUser | null> => {
     try {
-      // Fetch role
       const { data: roleData } = await supabase
         .from("user_roles")
         .select("role")
         .eq("user_id", user.id)
         .single();
 
-      // Fetch profile
       const { data: profileData } = await supabase
         .from("profiles")
         .select("name, username, subject, status")
@@ -60,27 +60,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
+    isMounted.current = true;
+
+    // Initial session check
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!isMounted.current) return;
+      if (session?.user) {
+        const userData = await fetchUserData(session.user);
+        if (isMounted.current) {
+          setAuthUser(userData);
+        }
+      }
+      if (isMounted.current) {
+        initialLoadDone.current = true;
+        setLoading(false);
+      }
+    });
+
+    // Listen for auth changes (login/logout after initial load)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        if (!isMounted.current) return;
+        // Skip if initial load hasn't completed yet
+        if (!initialLoadDone.current) return;
+
         if (session?.user) {
           const userData = await fetchUserData(session.user);
-          setAuthUser(userData);
+          if (isMounted.current) {
+            setAuthUser(userData);
+          }
         } else {
-          setAuthUser(null);
+          if (isMounted.current) {
+            setAuthUser(null);
+          }
         }
-        setLoading(false);
       }
     );
 
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user) {
-        const userData = await fetchUserData(session.user);
-        setAuthUser(userData);
-      }
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted.current = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (username: string, password: string) => {

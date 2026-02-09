@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -13,16 +13,17 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const { signIn, authUser } = useAuth();
+  const { signIn, authUser, loading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Redirect if already logged in
-  if (authUser) {
-    const path = authUser.role === "admin" ? "/admin" : "/teacher";
-    navigate(path, { replace: true });
-    return null;
-  }
+  // Redirect when authUser changes
+  useEffect(() => {
+    if (authUser) {
+      const path = authUser.role === "admin" ? "/admin" : authUser.role === "system_admin" ? "/system" : "/teacher";
+      navigate(path, { replace: true });
+    }
+  }, [authUser, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,16 +31,24 @@ const Login = () => {
 
     setIsLoading(true);
     const { error } = await signIn(username.trim(), password);
-    setIsLoading(false);
-
     if (error) {
+      setIsLoading(false);
       toast({
         title: "خطأ في تسجيل الدخول",
         description: error,
         variant: "destructive",
       });
     }
+    // On success, onAuthStateChange will update authUser → useEffect redirects
   };
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="text-muted-foreground">جاري التحميل...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
