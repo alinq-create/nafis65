@@ -19,6 +19,8 @@ import TeacherAnalytics from "./pages/teacher/TeacherAnalytics";
 import StudentEntry from "./pages/student/StudentEntry";
 import TakeExam from "./pages/student/TakeExam";
 import SubmissionConfirmation from "./pages/student/SubmissionConfirmation";
+import SystemDashboard from "./pages/system/SystemDashboard";
+import ImportQuestionBank from "./pages/system/ImportQuestionBank";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -46,6 +48,10 @@ const App = () => (
             <Route path="/teacher/exams" element={<ProtectedRoute requiredRole="teacher"><CreateExam /></ProtectedRoute>} />
             <Route path="/teacher/attempts" element={<ProtectedRoute requiredRole="teacher"><ReviewAttempts /></ProtectedRoute>} />
             <Route path="/teacher/analytics" element={<ProtectedRoute requiredRole="teacher"><TeacherAnalytics /></ProtectedRoute>} />
+            
+            {/* System Admin Routes */}
+            <Route path="/system" element={<ProtectedRoute requiredRole="system_admin"><SystemDashboard /></ProtectedRoute>} />
+            <Route path="/system/import" element={<ProtectedRoute requiredRole="system_admin"><ImportQuestionBank /></ProtectedRoute>} />
             
             {/* Student Routes (no auth needed) */}
             <Route path="/student" element={<StudentEntry />} />

@@ -1,1 +1,19 @@
 project_id = "sijbkoyytxqmexpbtgvm"
+
+[functions.setup-admin]
+verify_jwt = false
+
+[functions.setup-system-admin]
+verify_jwt = false
+
+[functions.manage-teacher]
+verify_jwt = false
+
+[functions.student-exam-access]
+verify_jwt = false
+
+[functions.submit-exam]
+verify_jwt = false
+
+[functions.import-question-bank]
+verify_jwt = false
