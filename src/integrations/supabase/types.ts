@@ -44,18 +44,21 @@ export type Database = {
           id: string
           question_id: string
           question_order: number
+          source_type: string
         }
         Insert: {
           exam_id: string
           id?: string
           question_id: string
           question_order?: number
+          source_type?: string
         }
         Update: {
           exam_id?: string
           id?: string
           question_id?: string
           question_order?: number
+          source_type?: string
         }
         Relationships: [
           {
