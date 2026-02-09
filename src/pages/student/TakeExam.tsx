@@ -12,12 +12,18 @@ import { ChevronRight, ChevronLeft, Send } from "lucide-react";
 interface ExamQuestion {
   id: string;
   question_type: string;
-  page_image_name: string;
-  frame_top: number;
-  frame_left: number;
-  frame_width: number;
-  frame_height: number;
+  page_image_name?: string;
+  frame_top?: number;
+  frame_left?: number;
+  frame_width?: number;
+  frame_height?: number;
   question_order: number;
+  source_type?: string;
+  question_text?: string;
+  option_a?: string;
+  option_b?: string;
+  option_c?: string;
+  option_d?: string;
 }
 
 const TakeExam = () => {
@@ -41,12 +47,15 @@ const TakeExam = () => {
   const currentQuestion = sortedQuestions[currentIndex];
   const totalQuestions = sortedQuestions.length;
 
-  const getImageUrl = (imageName: string) => {
+  const getImageUrl = (imageName?: string) => {
+    if (!imageName) return '';
     const { data } = supabase.storage
       .from("question-images")
       .getPublicUrl(imageName);
     return data.publicUrl;
   };
+
+  const isTextQuestion = currentQuestion?.source_type === 'text';
 
   const handleAnswer = (value: string) => {
     setAnswers((prev) => ({ ...prev, [currentQuestion.id]: value }));
@@ -102,18 +111,30 @@ const TakeExam = () => {
       {/* Question */}
       <div className="flex-1 flex items-center justify-center p-6">
         <div className="w-full max-w-3xl space-y-6">
-          {/* Cropped Image */}
+          {/* Question Content */}
           <Card className="overflow-hidden">
-            <CardContent className="p-0">
-              <div
-                className="w-full min-h-[300px] bg-muted"
-                style={{
-                  backgroundImage: `url(${getImageUrl(currentQuestion.page_image_name)})`,
-                  backgroundSize: `${100 / currentQuestion.frame_width}% ${100 / currentQuestion.frame_height}%`,
-                  backgroundPosition: `${(currentQuestion.frame_left / (1 - currentQuestion.frame_width)) * 100}% ${(currentQuestion.frame_top / (1 - currentQuestion.frame_height)) * 100}%`,
-                  backgroundRepeat: "no-repeat",
-                }}
-              />
+            <CardContent className={isTextQuestion ? "p-6" : "p-0"}>
+              {isTextQuestion ? (
+                <div className="space-y-4">
+                  <p className="text-lg font-medium leading-relaxed">{currentQuestion.question_text}</p>
+                  <div className="grid grid-cols-1 gap-2 text-base">
+                    {currentQuestion.option_a && <p>أ) {currentQuestion.option_a}</p>}
+                    {currentQuestion.option_b && <p>ب) {currentQuestion.option_b}</p>}
+                    {currentQuestion.option_c && <p>ج) {currentQuestion.option_c}</p>}
+                    {currentQuestion.option_d && <p>د) {currentQuestion.option_d}</p>}
+                  </div>
+                </div>
+              ) : (
+                <div
+                  className="w-full min-h-[300px] bg-muted"
+                  style={{
+                    backgroundImage: `url(${getImageUrl(currentQuestion.page_image_name)})`,
+                    backgroundSize: `${100 / (currentQuestion.frame_width || 1)}% ${100 / (currentQuestion.frame_height || 1)}%`,
+                    backgroundPosition: `${((currentQuestion.frame_left || 0) / (1 - (currentQuestion.frame_width || 1))) * 100}% ${((currentQuestion.frame_top || 0) / (1 - (currentQuestion.frame_height || 1))) * 100}%`,
+                    backgroundRepeat: "no-repeat",
+                  }}
+                />
+              )}
             </CardContent>
           </Card>
 
