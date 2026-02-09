@@ -195,14 +195,19 @@ const ManageTeachers = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>اسم المستخدم</Label>
+                  <Label>اسم المستخدم (بالإنجليزية فقط)</Label>
                   <Input
                     value={formData.username}
-                    onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                    placeholder="اسم المستخدم للدخول"
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/[^a-zA-Z0-9._-]/g, "");
+                      setFormData({ ...formData, username: val });
+                    }}
+                    placeholder="مثال: teacher1"
                     required
                     dir="ltr"
                     className="text-left"
+                    pattern="[a-zA-Z0-9._-]+"
+                    title="يجب أن يكون اسم المستخدم بالإنجليزية فقط (أحرف وأرقام)"
                   />
                 </div>
                 <div className="space-y-2">
