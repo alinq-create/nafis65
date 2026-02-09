@@ -1,7 +1,7 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { useNavigate, useLocation } from "react-router-dom";
-import { LogOut, LayoutDashboard, Users, BookOpen, FileText, ClipboardCheck, BarChart3 } from "lucide-react";
+import { LogOut, LayoutDashboard, Users, BookOpen, FileText, ClipboardCheck, BarChart3, Upload, Settings } from "lucide-react";
 
 const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   const { authUser, signOut } = useAuth();
@@ -13,7 +13,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
     navigate("/login");
   };
 
-  const isAdmin = authUser?.role === "admin";
+  const role = authUser?.role;
 
   const adminLinks = [
     { path: "/admin", label: "الرئيسية", icon: LayoutDashboard },
@@ -30,7 +30,12 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
     { path: "/teacher/analytics", label: "التحليلات", icon: BarChart3 },
   ];
 
-  const links = isAdmin ? adminLinks : teacherLinks;
+  const systemAdminLinks = [
+    { path: "/system", label: "الرئيسية", icon: LayoutDashboard },
+    { path: "/system/import", label: "استيراد بنك الأسئلة", icon: Upload },
+  ];
+
+  const links = role === "system_admin" ? systemAdminLinks : role === "admin" ? adminLinks : teacherLinks;
 
   return (
     <div className="flex min-h-screen">
@@ -39,7 +44,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
         <div className="p-6 border-b border-sidebar-border">
           <h1 className="text-xl font-bold">منصة نافس</h1>
           <p className="text-sm opacity-80 mt-1">
-            {isAdmin ? "لوحة المديرة" : "لوحة المعلمة"}
+            {role === "system_admin" ? "لوحة مدير النظام" : role === "admin" ? "لوحة المديرة" : "لوحة المعلمة"}
           </p>
         </div>
         

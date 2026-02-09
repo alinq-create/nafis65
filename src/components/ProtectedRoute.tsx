@@ -3,7 +3,7 @@ import { Navigate } from "react-router-dom";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  requiredRole?: "admin" | "teacher";
+  requiredRole?: "admin" | "teacher" | "system_admin";
 }
 
 const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
@@ -22,7 +22,12 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
   }
 
   if (requiredRole && authUser.role !== requiredRole) {
-    const redirectPath = authUser.role === "admin" ? "/admin" : "/teacher";
+    const redirectMap: Record<string, string> = {
+      admin: "/admin",
+      teacher: "/teacher",
+      system_admin: "/system",
+    };
+    const redirectPath = redirectMap[authUser.role || ""] || "/login";
     return <Navigate to={redirectPath} replace />;
   }
 
