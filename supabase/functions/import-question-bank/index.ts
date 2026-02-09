@@ -25,23 +25,21 @@ serve(async (req) => {
       });
     }
 
-    const userClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-
     const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await userClient.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
+    const adminClient = createClient(supabaseUrl, serviceKey);
+
+    // Decode JWT to get user id
+    const { data: userData, error: userError } = await adminClient.auth.getUser(token);
+    if (userError || !userData?.user) {
       return new Response(JSON.stringify({ error: "غير مصرح" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const userId = claimsData.claims.sub;
+    const userId = userData.user.id;
 
-    // Verify system_admin role using service client
-    const adminClient = createClient(supabaseUrl, serviceKey);
+    // Verify system_admin role
     const { data: roleData } = await adminClient
       .from("user_roles")
       .select("role")
@@ -56,7 +54,7 @@ serve(async (req) => {
       });
     }
 
-    const { questions, subject } = await req.json();
+    const { questions } = await req.json();
 
     if (!questions || !Array.isArray(questions) || questions.length === 0) {
       return new Response(JSON.stringify({ error: "لا توجد أسئلة لاستيرادها" }), {
@@ -65,10 +63,47 @@ serve(async (req) => {
       });
     }
 
-    // Insert questions in batches
-    const rows = questions.map((q: any) => ({
+    // ─── Deduplication: find existing questions by (subject, page_number, question_number) ───
+
+    // Collect unique subjects for the query
+    const subjects = [...new Set(questions.map((q: any) => q.subject || "رياضيات"))];
+
+    // Fetch existing questions for these subjects
+    const { data: existingQuestions } = await adminClient
+      .from("question_bank")
+      .select("subject, page_number, question_number")
+      .in("subject", subjects);
+
+    // Build a set of "subject|page|question" keys for fast lookup
+    const existingKeys = new Set<string>();
+    if (existingQuestions) {
+      for (const eq of existingQuestions) {
+        existingKeys.add(`${eq.subject}|${eq.page_number}|${eq.question_number}`);
+      }
+    }
+
+    // Filter out duplicates
+    const newQuestions = questions.filter((q: any) => {
+      const key = `${q.subject || "رياضيات"}|${q.page_number}|${q.question_number}`;
+      return !existingKeys.has(key);
+    });
+
+    const skippedCount = questions.length - newQuestions.length;
+
+    if (newQuestions.length === 0) {
+      return new Response(JSON.stringify({
+        success: true,
+        importedCount: 0,
+        skippedCount,
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Build rows for insertion
+    const rows = newQuestions.map((q: any) => ({
       teacher_id: userId,
-      subject: subject || "رياضيات",
+      subject: q.subject || "رياضيات",
       page_number: q.page_number,
       question_number: q.question_number,
       question_type: q.question_type || "اختيار متعدد",
@@ -78,8 +113,8 @@ serve(async (req) => {
       frame_width: q.frame_width || 1,
       frame_height: q.frame_height || 1,
       correct_answer: q.correct_answer,
+      visible_to_students: q.visible_to_students !== undefined ? q.visible_to_students : true,
       notes: q.notes || null,
-      visible_to_students: true,
     }));
 
     const { data: inserted, error: insertError } = await adminClient
@@ -97,6 +132,7 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       success: true,
       importedCount: inserted?.length || 0,
+      skippedCount,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
