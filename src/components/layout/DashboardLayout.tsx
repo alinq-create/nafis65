@@ -18,6 +18,8 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   const adminLinks = [
     { path: "/admin", label: "الرئيسية", icon: LayoutDashboard },
     { path: "/admin/teachers", label: "إدارة المعلمات", icon: Users },
+    { path: "/admin/attempts", label: "المحاولات المعتمدة", icon: ClipboardCheck },
+    { path: "/admin/analytics", label: "التحليلات", icon: BarChart3 },
   ];
 
   const teacherLinks = [
@@ -25,6 +27,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
     { path: "/teacher/questions", label: "بنك الأسئلة", icon: BookOpen },
     { path: "/teacher/exams", label: "الاختبارات", icon: FileText },
     { path: "/teacher/attempts", label: "المحاولات", icon: ClipboardCheck },
+    { path: "/teacher/analytics", label: "التحليلات", icon: BarChart3 },
   ];
 
   const links = isAdmin ? adminLinks : teacherLinks;
