@@ -298,6 +298,7 @@ export type Database = {
           question_type: string
           semester: string
           subject: string
+          visible_to_students: boolean
         }
         Insert: {
           correct_answer: string
@@ -316,6 +317,7 @@ export type Database = {
           question_type?: string
           semester: string
           subject?: string
+          visible_to_students?: boolean
         }
         Update: {
           correct_answer?: string
@@ -334,6 +336,7 @@ export type Database = {
           question_type?: string
           semester?: string
           subject?: string
+          visible_to_students?: boolean
         }
         Relationships: []
       }

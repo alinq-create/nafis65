@@ -63,17 +63,10 @@ const QuestionBank = () => {
 
   const handleToggleVisibility = async (question: UnifiedQuestion) => {
     const table = question.source === 'image' ? 'question_bank' : 'text_question_bank';
-    
-    // text_question_bank doesn't have visible_to_students column managed by teachers
-    // Only image questions support toggling for now
-    if (question.source === 'text') {
-      toast({ title: "الأسئلة النصية مرئية دائماً للطالبات", variant: "default" });
-      return;
-    }
 
     await supabase
       .from(table)
-      .update({ visible_to_students: !question.visible_to_students })
+      .update({ visible_to_students: !question.visible_to_students } as any)
       .eq("id", question.id);
     fetchQuestions();
   };
@@ -154,7 +147,6 @@ const QuestionBank = () => {
                         <Switch
                           checked={q.visible_to_students}
                           onCheckedChange={() => handleToggleVisibility(q)}
-                          disabled={q.source === 'text'}
                         />
                       </TableCell>
                     </TableRow>
