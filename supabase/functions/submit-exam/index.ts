@@ -105,7 +105,11 @@ serve(async (req) => {
       attempt_id: attempt.id,
     }));
 
-    await adminClient.from("student_answers").insert(answersToInsert);
+    const { error: answersError } = await adminClient.from("student_answers").insert(answersToInsert);
+
+    if (answersError) {
+      throw answersError;
+    }
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -226,13 +226,6 @@ export type Database = {
             referencedRelation: "student_attempts"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "student_answers_question_id_fkey"
-            columns: ["question_id"]
-            isOneToOne: false
-            referencedRelation: "question_bank"
-            referencedColumns: ["id"]
-          },
         ]
       }
       student_attempts: {
