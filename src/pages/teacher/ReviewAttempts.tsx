@@ -187,9 +187,9 @@ const ReviewAttempts = () => {
     const isCorrect = optionKey === correctAnswer?.toLowerCase();
     const isStudentChoice = optionKey === studentAnswer?.toLowerCase();
 
-    if (isCorrect) return "border-green-500 bg-green-50 dark:bg-green-950/30";
-    if (isStudentChoice && !isCorrect) return "border-red-500 bg-red-50 dark:bg-red-950/30";
-    return "border-border";
+    if (isCorrect) return "border-green-400 bg-green-50 dark:bg-green-950/30";
+    if (isStudentChoice && !isCorrect) return "border-red-400 bg-red-50 dark:bg-red-950/30";
+    return "border-gray-200 dark:border-gray-700";
   };
 
   const pendingAttempts = attempts.filter((a) => a.status === "بانتظار الاعتماد");
@@ -281,10 +281,13 @@ const ReviewAttempts = () => {
                               </span>
                             )}
                             {isCorrect && !isStudentChoice && (
-                              <CheckCircle className="h-5 w-5 text-green-600 shrink-0" />
+                              <span className="flex items-center gap-1 text-xs text-green-600 shrink-0">
+                                <CheckCircle className="h-5 w-5" />
+                                الإجابة الصحيحة
+                              </span>
                             )}
                             {isStudentChoice && !isCorrect && (
-                              <span className="flex items-center gap-1 text-xs text-red-600 shrink-0">
+                              <span className="flex items-center gap-1 text-xs text-red-500 shrink-0">
                                 <XCircle className="h-5 w-5" />
                                 إجابة الطالبة
                               </span>
