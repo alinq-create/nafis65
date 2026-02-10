@@ -46,14 +46,25 @@ serve(async (req) => {
       });
     }
 
-    // Get correct answers for auto-scoring
+    // Get correct answers for auto-scoring from both question banks
     const questionIds = answers.map((a: any) => a.questionId);
-    const { data: correctAnswers } = await adminClient
+    
+    const { data: imgAnswers } = await adminClient
       .from("question_bank")
       .select("id, correct_answer, question_type")
       .in("id", questionIds);
 
-    const correctMap = new Map(correctAnswers?.map((q) => [q.id, q]) ?? []);
+    const correctMap = new Map(imgAnswers?.map((q) => [q.id, q]) ?? []);
+
+    // Find IDs not in question_bank and search text_question_bank
+    const missingIds = questionIds.filter((id: string) => !correctMap.has(id));
+    if (missingIds.length > 0) {
+      const { data: textAnswers } = await adminClient
+        .from("text_question_bank")
+        .select("id, correct_answer, question_type")
+        .in("id", missingIds);
+      textAnswers?.forEach((q) => correctMap.set(q.id, q));
+    }
 
     // Calculate auto score
     let correctCount = 0;

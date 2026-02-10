@@ -33,6 +33,8 @@ interface AnswerDetail {
   question_number: number;
   page_number: number;
   question_type: string;
+  question_text?: string;
+  source?: string;
 }
 
 const ReviewAttempts = () => {
@@ -91,12 +93,24 @@ const ReviewAttempts = () => {
     }
 
     const questionIds = answersData.map((a) => a.question_id);
-    const { data: questionsData } = await supabase
+    
+    // Fetch from question_bank (image questions)
+    const { data: imgQuestions } = await supabase
       .from("question_bank")
       .select("id, correct_answer, question_number, page_number, question_type")
       .in("id", questionIds);
 
-    const questionMap = new Map(questionsData?.map((q) => [q.id, q]) ?? []);
+    const questionMap = new Map(imgQuestions?.map((q) => [q.id, { ...q, source: "image" }]) ?? []);
+
+    // Find missing IDs and fetch from text_question_bank
+    const missingIds = questionIds.filter((id) => !questionMap.has(id));
+    if (missingIds.length > 0) {
+      const { data: textQuestions } = await supabase
+        .from("text_question_bank")
+        .select("id, correct_answer, question_number, question_type, question_text")
+        .in("id", missingIds);
+      textQuestions?.forEach((q) => questionMap.set(q.id, { ...q, page_number: 0, source: "text" }));
+    }
 
     const details: AnswerDetail[] = answersData.map((a) => {
       const q = questionMap.get(a.question_id);
@@ -106,6 +120,8 @@ const ReviewAttempts = () => {
         question_number: q?.question_number ?? 0,
         page_number: q?.page_number ?? 0,
         question_type: q?.question_type ?? "",
+        question_text: (q as any)?.question_text ?? undefined,
+        source: q?.source ?? "image",
       };
     });
 
@@ -218,7 +234,11 @@ const ReviewAttempts = () => {
                 <TableBody>
                   {answers.map((a) => (
                     <TableRow key={a.id}>
-                      <TableCell>ص{a.page_number} - س{a.question_number}</TableCell>
+                      <TableCell>
+                        {a.source === "text" && a.question_text
+                          ? `س${a.question_number}: ${a.question_text.substring(0, 50)}${a.question_text.length > 50 ? "..." : ""}`
+                          : `ص${a.page_number} - س${a.question_number}`}
+                      </TableCell>
                       <TableCell>{a.student_answer || "—"}</TableCell>
                       <TableCell className="font-medium">{a.correct_answer}</TableCell>
                       <TableCell>
