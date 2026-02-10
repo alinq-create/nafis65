@@ -1,12 +1,14 @@
 import { useState, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, FileSpreadsheet, Play, CheckCircle2 } from "lucide-react";
+import { Upload, FileSpreadsheet, Play, CheckCircle2, AlertTriangle } from "lucide-react";
 import * as XLSX from "xlsx";
 
 /* ─── Types ─── */
@@ -117,9 +119,14 @@ function normalizeAnswer(raw: string): string {
 
 /* ─── Component ─── */
 
+const VALID_SUBJECTS = ["علوم", "لغتي"];
+
 const ImportTextQuestions = () => {
   const { authUser } = useAuth();
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
+  const fixedSubject = searchParams.get("subject");
+  const isValidSubject = fixedSubject && VALID_SUBJECTS.includes(fixedSubject);
 
   const [excelFile, setExcelFile] = useState<File | null>(null);
   const [parsedQuestions, setParsedQuestions] = useState<ParsedTextQuestion[]>([]);
@@ -156,13 +163,12 @@ const ImportTextQuestions = () => {
           mapped[fieldName] = row[excelCol];
         }
 
-        const rawSubject = mapped.subject ? String(mapped.subject).trim() : "";
         const rawGrade = mapped.grade ? String(mapped.grade).trim() : "";
         const rawSemester = mapped.semester ? String(mapped.semester).trim() : "";
         const rawAnswer = mapped.correct_answer ? String(mapped.correct_answer).trim() : "";
 
         return {
-          subject: rawSubject || "رياضيات",
+          subject: fixedSubject!,
           grade: normalizeGrade(rawGrade),
           semester: rawSemester ? normalizeSemester(rawSemester) : "غير محدد",
           question_number: Number(mapped.question_number) || 0,
@@ -264,14 +270,27 @@ const ImportTextQuestions = () => {
     <DashboardLayout>
       <div className="space-y-6">
         <div>
-          <h2 className="text-2xl font-bold">استيراد الأسئلة النصية</h2>
+          <h2 className="text-2xl font-bold">
+            {isValidSubject ? `استيراد أسئلة ${fixedSubject}` : "استيراد الأسئلة النصية"}
+          </h2>
           <p className="text-muted-foreground mt-1">
-            رفع ملف إكسل لاستيراد أسئلة اختيار من متعدد نصية
+            {isValidSubject
+              ? `رفع ملف إكسل لاستيراد أسئلة اختيار من متعدد لمادة ${fixedSubject}`
+              : "يرجى الوصول من لوحة مديرة النظام"}
           </p>
         </div>
 
+        {!isValidSubject && (
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              لم يتم تحديد المادة. يرجى العودة إلى لوحة مديرة النظام واختيار المادة المطلوبة.
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Upload Section */}
-        {!report && (
+        {isValidSubject && !report && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
