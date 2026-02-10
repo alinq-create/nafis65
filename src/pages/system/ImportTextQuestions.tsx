@@ -57,9 +57,14 @@ const COLUMN_MAP: Record<string, keyof ParsedTextQuestion> = {
   "خيار ب": "option_b",
   "خيار ج": "option_c",
   "خيار د": "option_d",
+  "الخيار ا": "option_a",
+  "الخيار ب": "option_b",
+  "الخيار ج": "option_c",
+  "الخيار د": "option_d",
   "الاجابة الصحيحة": "correct_answer",
   "نص الاجابة الصحيحة": "correct_answer_text",
   "ملاحظات": "notes",
+  "تحذير": "notes",
 };
 
 function buildHeaderMapping(headers: string[]): Record<string, keyof ParsedTextQuestion> {
@@ -159,7 +164,7 @@ const ImportTextQuestions = () => {
         return {
           subject: rawSubject || "رياضيات",
           grade: normalizeGrade(rawGrade),
-          semester: normalizeSemester(rawSemester),
+          semester: rawSemester ? normalizeSemester(rawSemester) : "غير محدد",
           question_number: Number(mapped.question_number) || 0,
           question_type: "اختيار متعدد",
           question_text: String(mapped.question_text || ""),

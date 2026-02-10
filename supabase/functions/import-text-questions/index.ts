@@ -99,6 +99,7 @@ Deno.serve(async (req) => {
           correct_answer: q.correct_answer,
           correct_answer_text: q.correct_answer_text || null,
           notes: q.notes || null,
+          visible_to_students: false,
         });
 
       if (insertError) {
