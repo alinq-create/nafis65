@@ -1,27 +1,38 @@
 
+# اصلاح حفظ إجابات الطالبات للأسئلة النصية
 
-# اصلاح عرض اجابات الطالبات وتصحيح الأسئلة النصية
+## المشكلة الجذرية
+جدول `student_answers` يحتوي على قيد مفتاح أجنبي (Foreign Key) على عمود `question_id` يشير حصريا الى جدول `question_bank` (الأسئلة المصورة). عند محاولة حفظ إجابة على سؤال نصي من `text_question_bank`، يفشل الإدراج بسبب عدم وجود المعرّف في `question_bank`. والخطأ لا يظهر لأن الكود لا يتحقق من نتيجة الإدراج.
 
-## المشكلة
-عند فتح اجابات طالبة في صفحة مراجعة المحاولات، تظهر قائمة فارغة والدرجة "من 0". السبب أن النظام يبحث عن تفاصيل الأسئلة في جدول `question_bank` (الأسئلة المصورة) فقط، بينما الاختبار قد يحتوي أسئلة نصية من جدول `text_question_bank`.
+## الحل
 
-نفس المشكلة موجودة في التصحيح الآلي عند تقديم الاختبار.
+### 1. تعديل قاعدة البيانات (Migration)
+- حذف قيد المفتاح الأجنبي `student_answers_question_id_fkey` الذي يربط `question_id` بـ `question_bank(id)` فقط
+- هذا يسمح بتخزين معرّفات أسئلة من كلا الجدولين (`question_bank` و `text_question_bank`)
 
-## التعديلات
+```sql
+ALTER TABLE public.student_answers 
+  DROP CONSTRAINT student_answers_question_id_fkey;
+```
 
-### 1. اصلاح `supabase/functions/submit-exam/index.ts`
-- عند جلب الإجابات الصحيحة للتصحيح الآلي، البحث في كلا الجدولين:
-  - أولا في `question_bank` (الأسئلة المصورة)
-  - ثم في `text_question_bank` (الأسئلة النصية) للمعرّفات التي لم تُوجد
-- دمج النتائج في خريطة واحدة للمقارنة
+### 2. تعديل `supabase/functions/submit-exam/index.ts`
+- اضافة التحقق من خطأ إدراج الإجابات (السطر 108 حاليا لا يتحقق من الخطأ)
 
-### 2. اصلاح `src/pages/teacher/ReviewAttempts.tsx`
-- في دالة `handleViewAttempt`، بعد جلب الإجابات:
-  - جلب تفاصيل الأسئلة من `question_bank` و `text_question_bank` معا
-  - المعرّفات غير الموجودة في الجدول الأول يتم البحث عنها في الثاني
-  - تحديث واجهة عرض السؤال لإظهار نص السؤال للأسئلة النصية بدلا من "ص0 - س0"
+```typescript
+const { error: answersError } = await adminClient
+  .from("student_answers")
+  .insert(answersToInsert);
 
-## الملفات المعدلة
-- `supabase/functions/submit-exam/index.ts` - دعم التصحيح الآلي للأسئلة النصية
-- `src/pages/teacher/ReviewAttempts.tsx` - جلب وعرض تفاصيل الأسئلة من كلا المصدرين
+if (answersError) {
+  throw answersError;
+}
+```
 
+### الملفات المعدلة
+- Migration جديد لحذف قيد المفتاح الأجنبي
+- `supabase/functions/submit-exam/index.ts` - التحقق من خطأ الإدراج
+
+### النتيجة
+- الإجابات على الأسئلة النصية تُحفظ بنجاح
+- المعلمة تستطيع مشاهدة إجابات الطالبات والإجابات الصحيحة
+- التصحيح الآلي يعمل لكلا نوعي الأسئلة
