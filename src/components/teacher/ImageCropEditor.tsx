@@ -152,16 +152,20 @@ const ImageCropEditor = ({
         <div className="space-y-3">
           <Label className="text-base font-semibold">معاينة النتيجة</Label>
           <div className="border rounded-lg overflow-hidden bg-muted">
-            <div
-              className="w-full overflow-hidden"
-              style={{
-                backgroundImage: `url(${imageUrl})`,
-                backgroundSize: `100% ${100 / cropHeight}%`,
-                backgroundPosition: `0 ${(cropTop / cropHeight) * -100}%`,
-                aspectRatio: `auto`,
-                paddingBottom: `${cropHeight * 100}%`,
-              }}
-            />
+            <div style={{ overflow: 'hidden' }}>
+              <img
+                src={imageUrl}
+                alt="معاينة القص"
+                draggable={false}
+                style={{
+                  width: '100%',
+                  display: 'block',
+                  clipPath: `inset(${cropTop * 100}% 0 ${(1 - cropBottom) * 100}% 0)`,
+                  marginTop: `-${cropTop * 100}%`,
+                  marginBottom: `-${(1 - cropBottom) * 100}%`,
+                }}
+              />
+            </div>
           </div>
           <p className="text-sm text-muted-foreground text-center">
             هذا ما ستراه الطالبة في الاختبار
