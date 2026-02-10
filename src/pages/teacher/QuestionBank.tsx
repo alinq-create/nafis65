@@ -6,7 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import ImageCropEditor from "@/components/teacher/ImageCropEditor";
 
 interface UnifiedQuestion {
   id: string;
@@ -37,22 +39,19 @@ const QuestionBank = () => {
   const { authUser } = useAuth();
   const [questions, setQuestions] = useState<UnifiedQuestion[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editingQuestion, setEditingQuestion] = useState<UnifiedQuestion | null>(null);
   const { toast } = useToast();
 
   const fetchQuestions = async () => {
     if (!authUser) return;
-    
     const teacherSubject = authUser.profile?.subject || "رياضيات";
-    
     const { data, error } = await supabase.rpc('get_teacher_questions', {
       p_subject: teacherSubject,
     });
-
     if (error) {
       console.error("Error fetching questions:", error);
       toast({ title: "خطأ في جلب الأسئلة", variant: "destructive" });
     }
-
     setQuestions((data as UnifiedQuestion[]) ?? []);
     setLoading(false);
   };
@@ -64,24 +63,19 @@ const QuestionBank = () => {
   const handleToggleVisibility = async (question: UnifiedQuestion) => {
     const table = question.source === 'image' ? 'question_bank' : 'text_question_bank';
     const newValue = !question.visible_to_students;
-
-    // Optimistic update
-    setQuestions(prev => prev.map(q => 
-      q.id === question.id && q.source === question.source 
-        ? { ...q, visible_to_students: newValue } 
+    setQuestions(prev => prev.map(q =>
+      q.id === question.id && q.source === question.source
+        ? { ...q, visible_to_students: newValue }
         : q
     ));
-
     const { error } = await supabase
       .from(table)
       .update({ visible_to_students: newValue } as any)
       .eq("id", question.id);
-
     if (error) {
-      // Revert on failure
-      setQuestions(prev => prev.map(q => 
-        q.id === question.id && q.source === question.source 
-          ? { ...q, visible_to_students: !newValue } 
+      setQuestions(prev => prev.map(q =>
+        q.id === question.id && q.source === question.source
+          ? { ...q, visible_to_students: !newValue }
           : q
       ));
       toast({ title: "فشل تحديث حالة الظهور", variant: "destructive" });
@@ -89,26 +83,51 @@ const QuestionBank = () => {
   };
 
   const getImageUrl = (question: UnifiedQuestion) => {
-    if (!authUser || !question.page_image_name) return "";
-    const isOwnQuestion = question.teacher_id === authUser.user.id;
-    const path = isOwnQuestion
-      ? `${authUser.user.id}/${question.page_image_name}`
-      : `shared/${question.page_image_name}`;
-    const { data } = supabase.storage
-      .from("question-images")
-      .getPublicUrl(path);
+    if (!question.page_image_name) return "";
+    const path = `shared/${question.page_image_name}`;
+    const { data } = supabase.storage.from("question-images").getPublicUrl(path);
     return data.publicUrl;
+  };
+
+  const handleSaveCrop = async (top: number, left: number, width: number, height: number) => {
+    if (!editingQuestion) return;
+    const prev = editingQuestion;
+
+    // Optimistic update
+    setQuestions(qs => qs.map(q =>
+      q.id === prev.id && q.source === prev.source
+        ? { ...q, frame_top: top, frame_left: left, frame_width: width, frame_height: height }
+        : q
+    ));
+    setEditingQuestion(null);
+
+    const { error } = await supabase
+      .from("question_bank")
+      .update({ frame_top: top, frame_left: left, frame_width: width, frame_height: height })
+      .eq("id", prev.id);
+
+    if (error) {
+      // Revert
+      setQuestions(qs => qs.map(q =>
+        q.id === prev.id && q.source === prev.source
+          ? { ...q, frame_top: prev.frame_top, frame_left: prev.frame_left, frame_width: prev.frame_width, frame_height: prev.frame_height }
+          : q
+      ));
+      toast({ title: "فشل حفظ القص", variant: "destructive" });
+    } else {
+      toast({ title: "تم حفظ إطار القص بنجاح" });
+    }
   };
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
-          <div>
-            <h2 className="text-2xl font-bold">بنك الأسئلة</h2>
-            <p className="text-muted-foreground mt-1">
-              {questions.length} سؤال في البنك
-            </p>
-          </div>
+        <div>
+          <h2 className="text-2xl font-bold">بنك الأسئلة</h2>
+          <p className="text-muted-foreground mt-1">
+            {questions.length} سؤال في البنك
+          </p>
+        </div>
 
         <Card>
           <CardHeader>
@@ -145,14 +164,25 @@ const QuestionBank = () => {
                       </TableCell>
                       <TableCell className="font-medium">{q.correct_answer}</TableCell>
                       <TableCell>
-                        {q.page_image_name && q.frame_width && q.frame_height ? (
+                        {q.source === "image" && q.page_image_name && q.frame_width && q.frame_height ? (
                           <div
-                            className="w-24 h-16 bg-muted rounded overflow-hidden relative"
+                            className="w-24 h-16 bg-muted rounded overflow-hidden relative cursor-pointer hover:ring-2 hover:ring-primary transition-all"
                             style={{
                               backgroundImage: `url(${getImageUrl(q)})`,
                               backgroundSize: `${100 / q.frame_width}% ${100 / q.frame_height}%`,
                               backgroundPosition: `${(q.frame_left ?? 0) * 100}% ${(q.frame_top ?? 0) * 100}%`,
                             }}
+                            onClick={() => setEditingQuestion(q)}
+                            title="اضغطي لتعديل إطار القص"
+                          />
+                        ) : q.page_image_name ? (
+                          <div
+                            className="w-24 h-16 bg-muted rounded overflow-hidden relative cursor-pointer hover:ring-2 hover:ring-primary transition-all"
+                            style={{
+                              backgroundImage: `url(${getImageUrl(q)})`,
+                              backgroundSize: "cover",
+                            }}
+                            onClick={() => q.source === "image" && setEditingQuestion(q)}
                           />
                         ) : (
                           <p className="text-sm text-muted-foreground max-w-[200px] truncate">
@@ -174,6 +204,28 @@ const QuestionBank = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Crop Editor Dialog */}
+      <Dialog open={!!editingQuestion} onOpenChange={(open) => !open && setEditingQuestion(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              تعديل إطار القص — سؤال {editingQuestion?.question_number}
+            </DialogTitle>
+          </DialogHeader>
+          {editingQuestion && (
+            <ImageCropEditor
+              imageUrl={getImageUrl(editingQuestion)}
+              initialTop={editingQuestion.frame_top ?? 0}
+              initialLeft={editingQuestion.frame_left ?? 0}
+              initialWidth={editingQuestion.frame_width ?? 1}
+              initialHeight={editingQuestion.frame_height ?? 1}
+              onSave={handleSaveCrop}
+              onCancel={() => setEditingQuestion(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 };
