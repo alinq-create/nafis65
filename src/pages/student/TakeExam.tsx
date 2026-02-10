@@ -51,7 +51,7 @@ const TakeExam = () => {
     if (!imageName) return '';
     const { data } = supabase.storage
       .from("question-images")
-      .getPublicUrl(imageName);
+      .getPublicUrl(`shared/${imageName}`);
     return data.publicUrl;
   };
 
