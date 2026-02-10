@@ -1,38 +1,69 @@
 
-# اصلاح حفظ إجابات الطالبات للأسئلة النصية
 
-## المشكلة الجذرية
-جدول `student_answers` يحتوي على قيد مفتاح أجنبي (Foreign Key) على عمود `question_id` يشير حصريا الى جدول `question_bank` (الأسئلة المصورة). عند محاولة حفظ إجابة على سؤال نصي من `text_question_bank`، يفشل الإدراج بسبب عدم وجود المعرّف في `question_bank`. والخطأ لا يظهر لأن الكود لا يتحقق من نتيجة الإدراج.
+# تحسين شاشة مراجعة المحاولات مع Edge Function مخصصة
 
-## الحل
+## الوضع الحالي
+الكود الحالي في `ReviewAttempts.tsx` يجلب البيانات من الجهة الأمامية (Frontend) عبر استعلامات متعددة، لكنه لا يعرض خيارات الأسئلة أو صور الأسئلة المصورة بشكل كامل.
 
-### 1. تعديل قاعدة البيانات (Migration)
-- حذف قيد المفتاح الأجنبي `student_answers_question_id_fkey` الذي يربط `question_id` بـ `question_bank(id)` فقط
-- هذا يسمح بتخزين معرّفات أسئلة من كلا الجدولين (`question_bank` و `text_question_bank`)
+## التعديلات المطلوبة
 
-```sql
-ALTER TABLE public.student_answers 
-  DROP CONSTRAINT student_answers_question_id_fkey;
+### 1. انشاء Edge Function جديدة: `get-attempt-review`
+ملف: `supabase/functions/get-attempt-review/index.ts`
+
+المنطق:
+- تستقبل `attempt_id`
+- تجلب بيانات المحاولة من `student_attempts`
+- تجلب أسئلة الاختبار من `exam_questions` مع `source_type` و `question_order`
+- تقسم الأسئلة حسب المصدر:
+  - `image` من `question_bank` (مع `page_image_name`, `frame_top`, `frame_left`, `frame_width`, `frame_height`, `correct_answer`)
+  - `text` من `text_question_bank` (مع `question_text`, `option_a..d`, `correct_answer`)
+- تجلب إجابات الطالبة من `student_answers`
+- تدمج كل شيء في كائن واحد لكل سؤال مرتب حسب `question_order`
+- ترجع البيانات كاملة
+
+اضافة للملف `supabase/config.toml`:
+```toml
+[functions.get-attempt-review]
+verify_jwt = false
 ```
 
-### 2. تعديل `supabase/functions/submit-exam/index.ts`
-- اضافة التحقق من خطأ إدراج الإجابات (السطر 108 حاليا لا يتحقق من الخطأ)
+### 2. تعديل `src/pages/teacher/ReviewAttempts.tsx`
+- استبدال استعلامات `handleViewAttempt` المتعددة باستدعاء واحد للـ Edge Function
+- تحديث واجهة العرض لتشمل:
+  - للأسئلة النصية: نص السؤال + الخيارات الأربعة مع تمييز إجابة الطالبة والإجابة الصحيحة بالألوان
+  - للأسئلة المصورة: عرض صورة السؤال المقصوصة من الـ Storage
+  - الدرجة التلقائية لكل سؤال
+  - ملخص الدرجات في الأسفل مع حقل التعديل وزر الاعتماد
 
-```typescript
-const { error: answersError } = await adminClient
-  .from("student_answers")
-  .insert(answersToInsert);
+## الملفات المتأثرة
+- `supabase/functions/get-attempt-review/index.ts` (جديد)
+- `supabase/config.toml` (اضافة تكوين الدالة)
+- `src/pages/teacher/ReviewAttempts.tsx` (تعديل جلب البيانات وعرضها)
 
-if (answersError) {
-  throw answersError;
+## التفاصيل التقنية
+
+### بنية الاستجابة من Edge Function
+```text
+{
+  attempt: { id, student_name, class_number, auto_score, status, ... },
+  questions: [
+    {
+      question_id, source_type, question_order, question_type,
+      question_text (نصي), page_image_name (صوري),
+      frame_top, frame_left, frame_width, frame_height,
+      options: { a, b, c, d },
+      correct_answer,
+      student_answer,
+      auto_correct
+    }
+  ],
+  total_questions: number
 }
 ```
 
-### الملفات المعدلة
-- Migration جديد لحذف قيد المفتاح الأجنبي
-- `supabase/functions/submit-exam/index.ts` - التحقق من خطأ الإدراج
+### عرض السؤال في الواجهة
+- كل سؤال يعرض في بطاقة (Card) منفصلة بدل صفوف الجدول
+- الأسئلة النصية: نص السؤال + 4 خيارات (أخضر للصحيحة، أحمر لإجابة الطالبة الخاطئة)
+- الأسئلة المصورة: صورة مقصوصة من Storage bucket `question-images`
+- شريط ملخص في الأسفل: الدرجة الآلية / العدد الكلي + حقل تعديل + زر اعتماد
 
-### النتيجة
-- الإجابات على الأسئلة النصية تُحفظ بنجاح
-- المعلمة تستطيع مشاهدة إجابات الطالبات والإجابات الصحيحة
-- التصحيح الآلي يعمل لكلا نوعي الأسئلة
