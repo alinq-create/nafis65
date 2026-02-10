@@ -1,0 +1,1 @@
+ALTER TABLE public.text_question_bank ALTER COLUMN visible_to_students SET DEFAULT false;
