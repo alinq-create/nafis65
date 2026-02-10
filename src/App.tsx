@@ -17,6 +17,7 @@ import CreateExam from "./pages/teacher/CreateExam";
 import CreateNewExam from "./pages/teacher/CreateNewExam";
 import ReviewAttempts from "./pages/teacher/ReviewAttempts";
 import TeacherAnalytics from "./pages/teacher/TeacherAnalytics";
+import ExamAnalytics from "./pages/teacher/ExamAnalytics";
 import StudentEntry from "./pages/student/StudentEntry";
 import TakeExam from "./pages/student/TakeExam";
 import SubmissionConfirmation from "./pages/student/SubmissionConfirmation";
@@ -51,6 +52,7 @@ const App = () => (
             <Route path="/teacher/create-exam" element={<ProtectedRoute requiredRole="teacher"><CreateNewExam /></ProtectedRoute>} />
             <Route path="/teacher/attempts" element={<ProtectedRoute requiredRole="teacher"><ReviewAttempts /></ProtectedRoute>} />
             <Route path="/teacher/analytics" element={<ProtectedRoute requiredRole="teacher"><TeacherAnalytics /></ProtectedRoute>} />
+            <Route path="/teacher/exam-analytics/:examId" element={<ProtectedRoute requiredRole="teacher"><ExamAnalytics /></ProtectedRoute>} />
             
             {/* System Admin Routes */}
             <Route path="/system" element={<ProtectedRoute requiredRole="system_admin"><SystemDashboard /></ProtectedRoute>} />

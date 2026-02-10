@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
-interface ExamAnalytics {
+interface ExamAnalyticsData {
+  examId: string;
   examName: string;
   avgScore: number;
   totalAttempts: number;
@@ -24,7 +27,8 @@ interface QuestionAnalytics {
 
 const TeacherAnalytics = () => {
   const { authUser } = useAuth();
-  const [examAnalytics, setExamAnalytics] = useState<ExamAnalytics[]>([]);
+  const navigate = useNavigate();
+  const [examAnalytics, setExamAnalytics] = useState<ExamAnalyticsData[]>([]);
   const [classAnalytics, setClassAnalytics] = useState<ClassAnalytics[]>([]);
   const [questionAnalytics, setQuestionAnalytics] = useState<QuestionAnalytics[]>([]);
   const [allowedClasses, setAllowedClasses] = useState<number[]>([]);
@@ -93,7 +97,8 @@ const TeacherAnalytics = () => {
       });
 
       setExamAnalytics(
-        Array.from(examStatsMap.values()).map((d) => ({
+        Array.from(examStatsMap.entries()).map(([examId, d]) => ({
+          examId,
           examName: d.name,
           avgScore: Math.round((d.total / d.count) * 100) / 100,
           totalAttempts: d.count,
@@ -214,6 +219,18 @@ const TeacherAnalytics = () => {
                     <Bar dataKey="avgScore" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {examAnalytics.map((exam) => (
+                    <Button
+                      key={exam.examId}
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigate(`/teacher/exam-analytics/${exam.examId}`)}
+                    >
+                      تفاصيل: {exam.examName}
+                    </Button>
+                  ))}
+                </div>
               </CardContent>
             </Card>
 
