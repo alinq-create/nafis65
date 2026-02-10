@@ -21,7 +21,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, ChevronLeft, ChevronRight, Eye, Loader2, ArrowRight } from "lucide-react";
+import { CheckCircle, XCircle, ChevronLeft, ChevronRight, Eye, Loader2, ArrowRight } from "lucide-react";
 
 interface AttemptWithExam {
   id: string;
@@ -188,7 +188,7 @@ const ReviewAttempts = () => {
     const isStudentChoice = optionKey === studentAnswer?.toLowerCase();
 
     if (isCorrect) return "border-green-500 bg-green-50 dark:bg-green-950/30";
-    if (isStudentChoice && !isCorrect) return "border-blue-500 bg-blue-50 dark:bg-blue-950/30";
+    if (isStudentChoice && !isCorrect) return "border-red-500 bg-red-50 dark:bg-red-950/30";
     return "border-border";
   };
 
@@ -274,35 +274,82 @@ const ReviewAttempts = () => {
                             <span className="flex-1">
                               {currentQ.options![key as keyof typeof currentQ.options]}
                             </span>
-                            {isCorrect && (
+                            {isCorrect && isStudentChoice && (
+                              <span className="flex items-center gap-1 text-xs text-green-600 shrink-0">
+                                <CheckCircle className="h-5 w-5" />
+                                إجابة صحيحة
+                              </span>
+                            )}
+                            {isCorrect && !isStudentChoice && (
                               <CheckCircle className="h-5 w-5 text-green-600 shrink-0" />
                             )}
                             {isStudentChoice && !isCorrect && (
-                              <span className="text-xs text-blue-600 shrink-0">إجابة الطالبة</span>
+                              <span className="flex items-center gap-1 text-xs text-red-600 shrink-0">
+                                <XCircle className="h-5 w-5" />
+                                إجابة الطالبة
+                              </span>
                             )}
                           </div>
                         );
                       })}
+
+                      {/* Summary line */}
+                      <div className="bg-muted/50 rounded-lg p-3 text-sm space-y-1 mt-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground">إجابة الطالبة:</span>
+                          {currentQ.student_answer ? (
+                            <span className={`font-bold ${currentQ.student_answer?.toLowerCase() === currentQ.correct_answer?.toLowerCase() ? "text-green-600" : "text-red-600"}`}>
+                              ({optionLabels[currentQ.student_answer?.toLowerCase()] || currentQ.student_answer})
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground italic">لم تجب</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground">الإجابة النموذجية:</span>
+                          <span className="font-bold text-green-600">
+                            ({optionLabels[currentQ.correct_answer?.toLowerCase()] || currentQ.correct_answer})
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   )}
 
                   {/* Image question answer display */}
                   {currentQ.source_type === "image" && (
                     <div className="space-y-2 text-sm">
-                      <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground">إجابة الطالبة:</span>
-                        {currentQ.student_answer ? (
-                          <span className="font-bold text-blue-600">{currentQ.student_answer}</span>
-                        ) : (
-                          <span className="text-muted-foreground italic">لم تجب الطالبة على هذا السؤال</span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground">الإجابة الصحيحة:</span>
-                        <span className="font-bold text-green-600 flex items-center gap-1">
-                          {currentQ.correct_answer}
-                          <CheckCircle className="h-4 w-4" />
-                        </span>
+                      {!currentQ.student_answer && (
+                        <p className="text-muted-foreground italic bg-muted/50 rounded-lg p-3">
+                          لم تجب الطالبة على هذا السؤال
+                        </p>
+                      )}
+                      <div className="bg-muted/50 rounded-lg p-3 space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground">إجابة الطالبة:</span>
+                          {currentQ.student_answer ? (
+                            currentQ.student_answer?.toLowerCase() === currentQ.correct_answer?.toLowerCase() ? (
+                              <span className="font-bold text-green-600 flex items-center gap-1">
+                                {currentQ.student_answer}
+                                <CheckCircle className="h-4 w-4" />
+                                <span className="text-xs">إجابة صحيحة</span>
+                              </span>
+                            ) : (
+                              <span className="font-bold text-red-600 flex items-center gap-1">
+                                {currentQ.student_answer}
+                                <XCircle className="h-4 w-4" />
+                              </span>
+                            )
+                          ) : (
+                            <span className="text-muted-foreground italic">لم تجب</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground">الإجابة النموذجية:</span>
+                          <span className="font-bold text-green-600 flex items-center gap-1">
+                            {currentQ.correct_answer}
+                            <CheckCircle className="h-4 w-4" />
+                          </span>
+                        </div>
                       </div>
                     </div>
                   )}
