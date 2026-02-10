@@ -14,10 +14,16 @@ const SystemDashboard = () => {
       path: "/system/import",
     },
     {
-      title: "استيراد الأسئلة النصية",
-      description: "رفع ملف إكسل لاستيراد أسئلة اختيار من متعدد نصية",
+      title: "استيراد أسئلة العلوم",
+      description: "رفع ملف إكسل لاستيراد أسئلة اختيار من متعدد لمادة العلوم",
       icon: FileText,
-      path: "/system/import-text",
+      path: "/system/import-text?subject=علوم",
+    },
+    {
+      title: "استيراد أسئلة لغتي",
+      description: "رفع ملف إكسل لاستيراد أسئلة اختيار من متعدد لمادة لغتي",
+      icon: FileText,
+      path: "/system/import-text?subject=لغتي",
     },
   ];
 
