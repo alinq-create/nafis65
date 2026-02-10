@@ -1,39 +1,41 @@
 
 
-# مشاركة القص بين المعلمات
+# تعديل نظام استيراد الأسئلة النصية ليتوافق مع ملف Excel الفعلي
 
-## الوضع الحالي
-- بيانات القص (frame_top, frame_height...) محفوظة في جدول `question_bank` المشترك
-- **القراءة** تعمل: كل معلمة من نفس المادة ترى نفس بيانات القص
-- **التعديل لا يعمل**: سياسة الامان (RLS) تشترط `teacher_id = auth.uid()` للتحديث، فالمعلمة لا تستطيع تعديل قص سؤال رفعته معلمة اخرى
+## المشكلة
+ملف Excel المرفق يحتوي على أعمدة بأسماء مختلفة قليلا عما يتوقعه النظام الحالي، مما يمنع الاستيراد الصحيح.
 
-## الحل
-تعديل سياسة التحديث في جدول `question_bank` للسماح لاي معلمة من نفس المادة بتعديل السؤال (وليس فقط من رفعته).
+## الفروقات بين الملف والنظام
 
-### 1. تعديل RLS Policy (migration)
-تحديث سياسة `update_questions` لتصبح:
+| العمود في Excel | ما يتوقعه النظام | الحالة |
+|---|---|---|
+| الخيار أ/ب/ج/د | خيار ا/ب/ج/د (بدون "ال") | لا يتطابق |
+| تحذير | ملاحظات | غير موجود في الخريطة |
+| (لا يوجد عمود فصل دراسي) | الفصل الدراسي (مطلوب) | مفقود |
+| visible_to_students | الافتراضي true | يجب أن يكون false |
+
+## التعديلات المطلوبة
+
+### 1. تعديل خريطة الأعمدة في `src/pages/system/ImportTextQuestions.tsx`
+- اضافة "الخيار ا" / "الخيار ب" / "الخيار ج" / "الخيار د" كمرادفات في COLUMN_MAP
+- اضافة "تحذير" كمرادف لـ "notes"
+- عند غياب عمود "الفصل الدراسي"، تعيين قيمة افتراضية (مثلا "غير محدد")
+
+### 2. تعديل القيمة الافتراضية لـ visible_to_students (Migration)
 ```sql
-DROP POLICY "update_questions" ON public.question_bank;
-CREATE POLICY "update_questions" ON public.question_bank
-  FOR UPDATE USING (
-    is_admin() OR is_system_admin() 
-    OR (is_teacher() AND teacher_id = auth.uid())
-    OR (is_teacher() AND subject = (
-      SELECT p.subject FROM profiles p WHERE p.user_id = auth.uid() LIMIT 1
-    ))
-  );
+ALTER TABLE public.text_question_bank 
+  ALTER COLUMN visible_to_students SET DEFAULT false;
 ```
-هذا يسمح لاي معلمة من نفس المادة بتعديل بيانات القص.
+هذا يجعل الأسئلة المستوردة مخفية افتراضيا حتى تفعّلها المعلمة.
 
-### 2. لا تغيير في الكود
-الكود الحالي في `QuestionBank.tsx` يحدّث `question_bank` مباشرة بالـ `id`، وكل المعلمات يقرأن من نفس الجدول. بمجرد فتح سياسة التحديث، سيعمل كل شيء تلقائيا:
-- معلمة تقص السؤال -> يُحفظ في `question_bank`
-- معلمة اخرى تفتح نفس السؤال -> ترى آخر قص محفوظ
-- يمكنها تعديله ايضا
+### 3. تعديل Edge Function `import-text-questions`
+- تعيين `visible_to_students: false` صراحة عند الادراج لضمان السلوك المتوقع بغض النظر عن الافتراضي.
 
 ## الملفات المعدلة
-- **Migration فقط**: تحديث سياسة `update_questions` على جدول `question_bank`
+- `src/pages/system/ImportTextQuestions.tsx` - توسيع خريطة الأعمدة ومعالجة القيم المفقودة
+- `supabase/functions/import-text-questions/index.ts` - تعيين visible_to_students = false
+- Migration جديد - تغيير القيمة الافتراضية
 
 ## ملاحظة
-لا حاجة لتعديل اي كود في الواجهة. البنية الحالية تدعم المشاركة بالفعل، المطلوب فقط رفع قيد الصلاحية.
+باقي المنظومة (بنك الأسئلة، انشاء الاختبار، عرض الاختبار للطالبة) يعمل بالفعل بشكل موحد ولا يحتاج تعديل.
 
