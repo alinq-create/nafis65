@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, Eye } from "lucide-react";
+import { CheckCircle, Eye, Loader2 } from "lucide-react";
 
 interface AttemptWithExam {
   id: string;
@@ -24,26 +24,36 @@ interface AttemptWithExam {
   exam_code: string;
 }
 
-interface AnswerDetail {
-  id: string;
+interface ReviewQuestion {
   question_id: string;
+  source_type: string;
+  question_order: number;
+  question_type: string;
+  question_text: string | null;
+  page_image_name: string | null;
+  frame_top: number;
+  frame_left: number;
+  frame_width: number;
+  frame_height: number;
+  options: { a: string; b: string; c: string; d: string } | null;
+  correct_answer: string;
   student_answer: string | null;
   auto_correct: boolean | null;
-  correct_answer: string;
-  question_number: number;
-  page_number: number;
-  question_type: string;
-  question_text?: string;
-  source?: string;
 }
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+
+const optionLabels: Record<string, string> = { a: "أ", b: "ب", c: "ج", d: "د" };
 
 const ReviewAttempts = () => {
   const { authUser } = useAuth();
   const [attempts, setAttempts] = useState<AttemptWithExam[]>([]);
   const [selectedAttempt, setSelectedAttempt] = useState<AttemptWithExam | null>(null);
-  const [answers, setAnswers] = useState<AnswerDetail[]>([]);
+  const [questions, setQuestions] = useState<ReviewQuestion[]>([]);
+  const [totalQuestions, setTotalQuestions] = useState(0);
   const [adjustedScore, setAdjustedScore] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingReview, setIsLoadingReview] = useState(false);
   const { toast } = useToast();
 
   const fetchAttempts = async () => {
@@ -81,52 +91,26 @@ const ReviewAttempts = () => {
   const handleViewAttempt = async (attempt: AttemptWithExam) => {
     setSelectedAttempt(attempt);
     setAdjustedScore(String(attempt.approved_score ?? attempt.auto_score ?? 0));
+    setIsLoadingReview(true);
+    setQuestions([]);
 
-    const { data: answersData } = await supabase
-      .from("student_answers")
-      .select("id, question_id, student_answer, auto_correct")
-      .eq("attempt_id", attempt.id);
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/get-attempt-review`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ attempt_id: attempt.id }),
+      });
 
-    if (!answersData?.length) {
-      setAnswers([]);
-      return;
+      if (!res.ok) throw new Error("Failed to fetch review data");
+
+      const data = await res.json();
+      setQuestions(data.questions ?? []);
+      setTotalQuestions(data.total_questions ?? 0);
+    } catch {
+      toast({ title: "خطأ في جلب بيانات المراجعة", variant: "destructive" });
+    } finally {
+      setIsLoadingReview(false);
     }
-
-    const questionIds = answersData.map((a) => a.question_id);
-    
-    // Fetch from question_bank (image questions)
-    const { data: imgQuestions } = await supabase
-      .from("question_bank")
-      .select("id, correct_answer, question_number, page_number, question_type")
-      .in("id", questionIds);
-
-    const questionMap = new Map(imgQuestions?.map((q) => [q.id, { ...q, source: "image" }]) ?? []);
-
-    // Find missing IDs and fetch from text_question_bank
-    const missingIds = questionIds.filter((id) => !questionMap.has(id));
-    if (missingIds.length > 0) {
-      const { data: textQuestions } = await supabase
-        .from("text_question_bank")
-        .select("id, correct_answer, question_number, question_type, question_text")
-        .in("id", missingIds);
-      textQuestions?.forEach((q) => questionMap.set(q.id, { ...q, page_number: 0, source: "text" }));
-    }
-
-    const details: AnswerDetail[] = answersData.map((a) => {
-      const q = questionMap.get(a.question_id);
-      return {
-        ...a,
-        correct_answer: q?.correct_answer ?? "",
-        question_number: q?.question_number ?? 0,
-        page_number: q?.page_number ?? 0,
-        question_type: q?.question_type ?? "",
-        question_text: (q as any)?.question_text ?? undefined,
-        source: q?.source ?? "image",
-      };
-    });
-
-    details.sort((a, b) => a.page_number - b.page_number || a.question_number - b.question_number);
-    setAnswers(details);
   };
 
   const handleApprove = async () => {
@@ -155,7 +139,90 @@ const ReviewAttempts = () => {
   const pendingAttempts = attempts.filter((a) => a.status === "بانتظار الاعتماد");
   const approvedAttempts = attempts.filter((a) => a.status === "معتمد");
 
-  const renderAttemptsTable = (items: AttemptWithExam[], showApproveAction: boolean) => {
+  const getOptionStyle = (
+    optionKey: string,
+    correctAnswer: string,
+    studentAnswer: string | null
+  ) => {
+    const isCorrect = optionKey === correctAnswer?.toLowerCase();
+    const isStudentChoice = optionKey === studentAnswer?.toLowerCase();
+
+    if (isCorrect) return "border-green-500 bg-green-50 dark:bg-green-950/30";
+    if (isStudentChoice && !isCorrect) return "border-red-500 bg-red-50 dark:bg-red-950/30";
+    return "border-border";
+  };
+
+  const renderQuestionCard = (q: ReviewQuestion, index: number) => {
+    const autoScore = q.auto_correct === true ? 1 : 0;
+
+    return (
+      <Card key={q.question_id} className="mb-3">
+        <CardContent className="p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="font-semibold text-sm">
+              السؤال {q.question_order}
+            </span>
+            <Badge
+              variant={q.auto_correct === true ? "default" : q.auto_correct === false ? "destructive" : "secondary"}
+              className={q.auto_correct === true ? "bg-green-600" : ""}
+            >
+              {q.auto_correct === true ? "صحيحة ✓" : q.auto_correct === false ? "خاطئة ✗" : "—"}
+            </Badge>
+          </div>
+
+          {/* Question content */}
+          {q.source_type === "text" && q.question_text && (
+            <p className="text-sm leading-relaxed">{q.question_text}</p>
+          )}
+
+          {q.source_type === "image" && q.page_image_name && (
+            <div className="overflow-hidden rounded border bg-muted">
+              <img
+                src={`${SUPABASE_URL}/storage/v1/object/public/question-images/${q.page_image_name}`}
+                alt={`سؤال ${q.question_order}`}
+                className="w-full"
+                style={{
+                  objectFit: "none",
+                  objectPosition: `-${q.frame_left}px -${q.frame_top}px`,
+                  width: `${q.frame_width}px`,
+                  height: `${q.frame_height}px`,
+                  maxWidth: "100%",
+                }}
+              />
+            </div>
+          )}
+
+          {/* Options for text questions */}
+          {q.source_type === "text" && q.options && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {(["a", "b", "c", "d"] as const).map((key) => (
+                <div
+                  key={key}
+                  className={`border rounded-md p-2 text-sm flex items-center gap-2 ${getOptionStyle(key, q.correct_answer, q.student_answer)}`}
+                >
+                  <span className="font-bold text-muted-foreground">{optionLabels[key]}</span>
+                  <span>{q.options![key as keyof typeof q.options]}</span>
+                  {key === q.correct_answer?.toLowerCase() && (
+                    <CheckCircle className="h-4 w-4 text-green-600 mr-auto" />
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* For image questions, show answer comparison inline */}
+          {q.source_type === "image" && (
+            <div className="flex gap-4 text-sm">
+              <span>إجابة الطالبة: <strong>{q.student_answer || "—"}</strong></span>
+              <span>الإجابة الصحيحة: <strong className="text-green-600">{q.correct_answer}</strong></span>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const renderAttemptsTable = (items: AttemptWithExam[]) => {
     if (items.length === 0) {
       return <p className="text-center text-muted-foreground py-8">لا توجد محاولات</p>;
     }
@@ -184,17 +251,13 @@ const ReviewAttempts = () => {
               <TableCell>
                 <Badge
                   variant={attempt.status === "معتمد" ? "default" : "secondary"}
-                  className={attempt.status === "معتمد" ? "bg-success text-success-foreground" : ""}
+                  className={attempt.status === "معتمد" ? "bg-green-600" : ""}
                 >
                   {attempt.status}
                 </Badge>
               </TableCell>
               <TableCell>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleViewAttempt(attempt)}
-                >
+                <Button variant="ghost" size="sm" onClick={() => handleViewAttempt(attempt)}>
                   <Eye className="h-4 w-4 ml-1" />
                   عرض
                 </Button>
@@ -205,6 +268,8 @@ const ReviewAttempts = () => {
       </Table>
     );
   };
+
+  const correctCount = questions.filter((q) => q.auto_correct === true).length;
 
   return (
     <DashboardLayout>
@@ -221,71 +286,56 @@ const ReviewAttempts = () => {
                 إجابات {selectedAttempt?.student_name} - فصل {selectedAttempt?.class_number}
               </DialogTitle>
             </DialogHeader>
-            <div className="space-y-4">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-right">السؤال</TableHead>
-                    <TableHead className="text-right">إجابة الطالبة</TableHead>
-                    <TableHead className="text-right">الإجابة الصحيحة</TableHead>
-                    <TableHead className="text-right">النتيجة</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {answers.map((a) => (
-                    <TableRow key={a.id}>
-                      <TableCell>
-                        {a.source === "text" && a.question_text
-                          ? `س${a.question_number}: ${a.question_text.substring(0, 50)}${a.question_text.length > 50 ? "..." : ""}`
-                          : `ص${a.page_number} - س${a.question_number}`}
-                      </TableCell>
-                      <TableCell>{a.student_answer || "—"}</TableCell>
-                      <TableCell className="font-medium">{a.correct_answer}</TableCell>
-                      <TableCell>
-                        {a.auto_correct === true ? (
-                          <Badge className="bg-success text-success-foreground">صحيحة</Badge>
-                        ) : a.auto_correct === false ? (
-                          <Badge variant="destructive">خاطئة</Badge>
-                        ) : (
-                          <Badge variant="secondary">—</Badge>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
 
-              {selectedAttempt?.status !== "معتمد" && (
-                <div className="flex items-center gap-4 pt-4 border-t">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">الدرجة:</span>
-                    <Input
-                      type="number"
-                      value={adjustedScore}
-                      onChange={(e) => setAdjustedScore(e.target.value)}
-                      className="w-24"
-                      dir="ltr"
-                    />
-                    <span className="text-muted-foreground">من {answers.length}</span>
-                  </div>
-                  <Button onClick={handleApprove} disabled={isSubmitting}>
-                    <CheckCircle className="h-4 w-4 ml-2" />
-                    {isSubmitting ? "جاري الاعتماد..." : "اعتماد النتيجة"}
-                  </Button>
+            {isLoadingReview ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Summary bar */}
+                <div className="flex items-center gap-4 p-3 rounded-lg bg-muted">
+                  <span className="text-sm font-medium">
+                    الدرجة الآلية: {correctCount} / {totalQuestions}
+                  </span>
                 </div>
-              )}
-            </div>
+
+                {/* Questions */}
+                {questions.map((q, i) => renderQuestionCard(q, i))}
+
+                {questions.length === 0 && (
+                  <p className="text-center text-muted-foreground py-8">لا توجد أسئلة</p>
+                )}
+
+                {/* Approve section */}
+                {selectedAttempt?.status !== "معتمد" && questions.length > 0 && (
+                  <div className="flex items-center gap-4 pt-4 border-t">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">الدرجة:</span>
+                      <Input
+                        type="number"
+                        value={adjustedScore}
+                        onChange={(e) => setAdjustedScore(e.target.value)}
+                        className="w-24"
+                        dir="ltr"
+                      />
+                      <span className="text-muted-foreground">من {totalQuestions}</span>
+                    </div>
+                    <Button onClick={handleApprove} disabled={isSubmitting}>
+                      <CheckCircle className="h-4 w-4 ml-2" />
+                      {isSubmitting ? "جاري الاعتماد..." : "اعتماد النتيجة"}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
           </DialogContent>
         </Dialog>
 
         <Tabs defaultValue="pending" dir="rtl">
           <TabsList>
-            <TabsTrigger value="pending">
-              بانتظار الاعتماد ({pendingAttempts.length})
-            </TabsTrigger>
-            <TabsTrigger value="approved">
-              معتمدة ({approvedAttempts.length})
-            </TabsTrigger>
+            <TabsTrigger value="pending">بانتظار الاعتماد ({pendingAttempts.length})</TabsTrigger>
+            <TabsTrigger value="approved">معتمدة ({approvedAttempts.length})</TabsTrigger>
           </TabsList>
 
           <TabsContent value="pending">
@@ -293,9 +343,7 @@ const ReviewAttempts = () => {
               <CardHeader>
                 <CardTitle>المحاولات بانتظار الاعتماد</CardTitle>
               </CardHeader>
-              <CardContent>
-                {renderAttemptsTable(pendingAttempts, true)}
-              </CardContent>
+              <CardContent>{renderAttemptsTable(pendingAttempts)}</CardContent>
             </Card>
           </TabsContent>
 
@@ -304,9 +352,7 @@ const ReviewAttempts = () => {
               <CardHeader>
                 <CardTitle>المحاولات المعتمدة</CardTitle>
               </CardHeader>
-              <CardContent>
-                {renderAttemptsTable(approvedAttempts, false)}
-              </CardContent>
+              <CardContent>{renderAttemptsTable(approvedAttempts)}</CardContent>
             </Card>
           </TabsContent>
         </Tabs>

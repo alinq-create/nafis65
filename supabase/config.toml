@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.import-text-questions]
 verify_jwt = false
+
+[functions.get-attempt-review]
+verify_jwt = false
