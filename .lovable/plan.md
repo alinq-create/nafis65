@@ -1,36 +1,39 @@
 
-# اصلاح معاينة محرر القص
 
-## المشكلة
-منطقة المعاينة (يسار) تعرض جزء مختلف عن اطار القص (يمين). السبب ان حساب `backgroundPosition` و `backgroundSize` بالنسب المئوية في CSS لا يعمل كما هو متوقع لان CSS تحسب background-position بطريقة خاصة نسبة للفرق بين حجم الحاوية وحجم الخلفية.
+# مشاركة القص بين المعلمات
+
+## الوضع الحالي
+- بيانات القص (frame_top, frame_height...) محفوظة في جدول `question_bank` المشترك
+- **القراءة** تعمل: كل معلمة من نفس المادة ترى نفس بيانات القص
+- **التعديل لا يعمل**: سياسة الامان (RLS) تشترط `teacher_id = auth.uid()` للتحديث، فالمعلمة لا تستطيع تعديل قص سؤال رفعته معلمة اخرى
 
 ## الحل
-استبدال طريقة المعاينة من `background-image` الى عنصر `img` حقيقي داخل حاوية مقصوصة باستخدام `clipPath: inset(...)` مع تعويض المسافة بـ `marginTop` سالب:
+تعديل سياسة التحديث في جدول `question_bank` للسماح لاي معلمة من نفس المادة بتعديل السؤال (وليس فقط من رفعته).
 
-### تعديل `src/components/teacher/ImageCropEditor.tsx` - قسم المعاينة (سطر 154-165)
-
-بدلا من:
-```text
-<div style={{ backgroundImage, backgroundSize, backgroundPosition, paddingBottom }} />
+### 1. تعديل RLS Policy (migration)
+تحديث سياسة `update_questions` لتصبح:
+```sql
+DROP POLICY "update_questions" ON public.question_bank;
+CREATE POLICY "update_questions" ON public.question_bank
+  FOR UPDATE USING (
+    is_admin() OR is_system_admin() 
+    OR (is_teacher() AND teacher_id = auth.uid())
+    OR (is_teacher() AND subject = (
+      SELECT p.subject FROM profiles p WHERE p.user_id = auth.uid() LIMIT 1
+    ))
+  );
 ```
+هذا يسمح لاي معلمة من نفس المادة بتعديل بيانات القص.
 
-نستخدم:
-```text
-<div style={{ overflow: 'hidden' }}>
-  <img 
-    src={imageUrl}
-    style={{
-      width: '100%',
-      display: 'block',
-      clipPath: `inset(${cropTop * 100}% 0 ${(1 - cropBottom) * 100}% 0)`,
-      marginTop: `-${cropTop * 100}%`,
-      marginBottom: `-${(1 - cropBottom) * 100}%`,
-    }}
-  />
-</div>
-```
+### 2. لا تغيير في الكود
+الكود الحالي في `QuestionBank.tsx` يحدّث `question_bank` مباشرة بالـ `id`، وكل المعلمات يقرأن من نفس الجدول. بمجرد فتح سياسة التحديث، سيعمل كل شيء تلقائيا:
+- معلمة تقص السؤال -> يُحفظ في `question_bank`
+- معلمة اخرى تفتح نفس السؤال -> ترى آخر قص محفوظ
+- يمكنها تعديله ايضا
 
-هذا يقص الصورة بالضبط من الحد العلوي والسفلي ويزيل المسافات الفارغة، فتتطابق المعاينة مع اطار القص.
+## الملفات المعدلة
+- **Migration فقط**: تحديث سياسة `update_questions` على جدول `question_bank`
 
-### الملفات المعدلة
-- `src/components/teacher/ImageCropEditor.tsx` فقط - قسم المعاينة
+## ملاحظة
+لا حاجة لتعديل اي كود في الواجهة. البنية الحالية تدعم المشاركة بالفعل، المطلوب فقط رفع قيد الصلاحية.
+
