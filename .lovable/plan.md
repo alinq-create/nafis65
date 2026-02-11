@@ -1,17 +1,37 @@
 
 
-# اضافة سطر تصحيح مؤقت في ImportTextQuestions.tsx
+# اضافة زر مؤقت لحذف جميع اسئلة لغتي في لوحة مدير النظام
 
-## الهدف
-اضافة `console.log("PARSED ROW SAMPLE:", rows[0])` مباشرة بعد قراءة صفوف Excel من XLSX لمعرفة اسماء الاعمدة الفعلية في الملف العربي.
+## الوصف
+اضافة زر "حذف جميع اسئلة لغتي" في صفحة SystemDashboard مع نافذة تاكيد قبل الحذف ورسالة نجاح بعده.
 
-## التغيير
-في ملف `src/pages/system/ImportTextQuestions.tsx`، بعد السطر الذي يقرأ الصفوف من ورقة Excel (عادة `XLSX.utils.sheet_to_json(...)`)، اضافة سطر واحد فقط:
+## التغييرات
 
-```typescript
-console.log("PARSED ROW SAMPLE:", rows[0]);
-```
+### ملف واحد: `src/pages/system/SystemDashboard.tsx`
+
+1. اضافة الاستيرادات اللازمة:
+   - `AlertDialog` وعناصره من مكتبة UI
+   - `Button` من مكتبة UI
+   - `Trash2` من lucide-react
+   - `supabase` من integrations
+   - `toast` من sonner
+   - `useState` من React
+
+2. اضافة state للتحكم في نافذة التاكيد وحالة التحميل:
+   - `showDeleteDialog` (boolean)
+   - `deleting` (boolean)
+
+3. اضافة دالة `handleDeleteLughati`:
+   - تنفذ `DELETE FROM text_question_bank WHERE subject = 'لغتي'` عبر Supabase client
+   - تعرض رسالة نجاح بعدد السجلات المحذوفة
+   - تعرض رسالة خطا في حال الفشل
+
+4. اضافة الزر ونافذة التاكيد (AlertDialog) اسفل شبكة البطاقات الموجودة:
+   - زر احمر اللون بعنوان "حذف جميع اسئلة لغتي"
+   - نافذة تاكيد تسال "هل انت متاكد من حذف جميع اسئلة لغتي؟" مع زر تاكيد وزر الغاء
 
 ## ملاحظات
-- لن يتم تعديل اي منطق اخر (لا كشف التكرار ولا مطابقة الاعمدة)
-- هذا سطر تصحيح مؤقت فقط لفحص بنية البيانات المقروءة من الملف
+- لا تغييرات على البطاقات الموجودة او اي منطق اخر
+- الزر مؤقت يمكن ازالته لاحقا
+- الحماية عبر RLS (مدير النظام فقط يملك صلاحية الحذف من text_question_bank)
+
