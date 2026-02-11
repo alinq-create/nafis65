@@ -182,6 +182,7 @@ const ImportTextQuestions = () => {
       const workbook = XLSX.read(data);
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet);
+      console.log("PARSED ROW SAMPLE:", rows[0]);
 
       if (rows.length === 0) {
         toast({ title: "الملف فارغ", description: "لا توجد بيانات في الملف", variant: "destructive" });
