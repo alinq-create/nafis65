@@ -1,90 +1,46 @@
 
 
-# نظام التقارير الشامل مع شعار المدرسة
+# اصلاح مطابقة اعمدة Excel في ImportTextQuestions
 
-## الملخص
-تنفيذ نظام التقارير المعتمد سابقا مع اضافة شعار المتوسطة في ترويسة كل تقرير مطبوع.
+## المشكلة
+دالة `buildHeaderMapping` تطابق اسماء الاعمدة فقط مع اسماء عربية محددة في `COLUMN_MAP`. اذا كان ملف Excel يحتوي على اعمدة بأسماء انجليزية (مثل `question_number`, `option_a`) فلن يتم التعرف عليها وتبقى القيم `undefined`.
 
-## الملفات
+## الحل
+تعديل ملف واحد: `src/pages/system/ImportTextQuestions.tsx`
 
-### 1. نسخ الشعار
-نسخ الصورة المرفوعة الى `src/assets/school-logo.png` لاستخدامها في صفحات التقارير.
+### التغييرات:
 
-### 2. ملف جديد: `src/lib/exportExcelReport.ts`
-دالة تصدير تقرير Excel بثلاث اوراق:
-- ملخص الاختبارات
-- اداء الطالبات
-- احصاءات الاسئلة
-
-### 3. ملف جديد: `src/pages/teacher/ExamReport.tsx`
-صفحة تقرير اختبار قابلة للطباعة تتضمن:
-- **ترويسة بالشعار**: صورة الشعار + عنوان "منصة نافس" + اسم التقرير
-- ملخص الاختبار واحصاءات الفصول
-- جدول درجات الطالبات
-- زر "طباعة / حفظ PDF"
-
-### 4. ملف جديد: `src/pages/teacher/StudentReport.tsx`
-صفحة تقرير طالبة فردية قابلة للطباعة تتضمن:
-- **ترويسة بالشعار**: نفس التصميم
-- ملخص الطالبة وجميع الدرجات
-- نقاط القوة والضعف والتوصيات
-
-### 5. تعديل: `src/App.tsx`
-اضافة routes:
-- `/teacher/exam-report/:examId`
-- `/teacher/student-report/:name/:class`
-
-### 6. تعديل: `src/pages/teacher/ExamAnalytics.tsx`
-اضافة زر "طباعة التقرير"
-
-### 7. تعديل: `src/pages/teacher/StudentProfile.tsx`
-اضافة زر "طباعة تقرير الطالبة"
-
-### 8. تعديل: `src/pages/teacher/TeacherAnalytics.tsx`
-اضافة زر "تصدير تقرير Excel"
-
-### 9. تعديل: `src/pages/admin/AdminAnalytics.tsx`
-اضافة زر "تصدير تقرير Excel"
-
-### 10. تعديل: `src/index.css`
-اضافة انماط `@media print` لاخفاء العناصر غير المطلوبة عند الطباعة.
-
----
-
-## تصميم ترويسة التقارير
-
-كل تقرير مطبوع سيحتوي على ترويسة موحدة:
-
-```text
-+--------------------------------------------------+
-|  [شعار المتوسطة]    منصة نافس - تقرير [النوع]    |
-|                    التاريخ: YYYY/MM/DD            |
-+--------------------------------------------------+
+**1. اضافة console.log لطباعة اسماء الاعمدة الفعلية (سطر 157-158)**
+```typescript
+console.log("Excel headers (raw):", excelHeaders);
+console.log("Excel headers (normalized):", excelHeaders.map(normalizeColumnName));
 ```
 
-- الشعار يظهر بحجم مناسب (حوالي 80x80 بكسل)
-- العنوان بجانب الشعار
-- التاريخ تحت العنوان
-- يستخدم `import schoolLogo from "@/assets/school-logo.png"`
+**2. توسيع `COLUMN_MAP` لدعم الاسماء الانجليزية (اسطر 51-70)**
+اضافة مفاتيح انجليزية بجانب العربية:
+- `"subject"` -> `subject`
+- `"grade"` -> `grade`
+- `"term"`, `"semester"` -> `semester`
+- `"question number"`, `"question_number"` -> `question_number`
+- `"question text"`, `"question_text"` -> `question_text`
+- `"option a"`, `"option_a"` -> `option_a` (وكذلك b, c, d)
+- `"correct answer"`, `"correct_answer"` -> `correct_answer`
+- `"passage id"`, `"passage_id"` -> (يتم تجاهلها حاليا حسب الطلب)
+- `"passage text"`, `"passage_text"` -> (يتم تجاهلها حاليا)
+- `"question type"`, `"question_type"` -> `question_type`
+- `"notes"` -> `notes`
+- `"correct answer text"`, `"correct_answer_text"` -> `correct_answer_text`
 
-## التفاصيل التقنية
+**3. تحسين `normalizeColumnName` لتشمل lowercase**
+اضافة `.toLowerCase()` للتعامل مع اختلاف حالة الاحرف الانجليزية.
 
-### تقرير Excel
-- يستخدم مكتبة `xlsx` المثبتة
-- 3 اوراق عمل بعناوين عربية
-- لا يتضمن الشعار (قيود مكتبة xlsx)
+**4. تحسين `buildHeaderMapping` بمطابقة مرنة**
+اذا لم يتم العثور على تطابق تام، يتم تجربة:
+- تطابق "يبدا بـ" (startsWith)
+- تطابق "يحتوي على" (includes)
 
-### تقارير PDF (طباعة)
-- صفحات مستقلة بدون DashboardLayout
-- خلفية بيضاء وخطوط نظيفة
-- RTL كامل
-- `window.print()` مع CSS مخصص للطباعة
-- الشعار يظهر في الترويسة
+مع طباعة النتيجة النهائية في console.
 
-### مسار العمل
-```text
-ExamAnalytics -> زر طباعة -> ExamReport (مع الشعار) -> window.print()
-StudentProfile -> زر طباعة -> StudentReport (مع الشعار) -> window.print()
-TeacherAnalytics -> زر تصدير -> exportExcelReport() -> ملف .xlsx
-```
+### النتيجة المتوقعة
+عند تحميل ملف Excel بأعمدة انجليزية او عربية، ستظهر القيم الصحيحة في المعاينة: رقم السؤال الحقيقي، نص السؤال، الخيارات، والاجابة الصحيحة.
 
