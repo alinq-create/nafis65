@@ -1,46 +1,43 @@
 
-
-# اصلاح مطابقة اعمدة Excel في ImportTextQuestions
+# اصلاح منطق كشف التكرار في import-text-questions
 
 ## المشكلة
-دالة `buildHeaderMapping` تطابق اسماء الاعمدة فقط مع اسماء عربية محددة في `COLUMN_MAP`. اذا كان ملف Excel يحتوي على اعمدة بأسماء انجليزية (مثل `question_number`, `option_a`) فلن يتم التعرف عليها وتبقى القيم `undefined`.
+سجل فارغ (question_text خالي) موجود في قاعدة البيانات من محاولة استيراد سابقة فاشلة. هذا يتسبب في اعتبار 234 سؤال كتكرار لان الدالة تقارن فقط بناء على (subject, grade, semester, question_number) بدون التحقق من ان question_text غير فارغ.
 
-## الحل
-تعديل ملف واحد: `src/pages/system/ImportTextQuestions.tsx`
+## التغييرات المطلوبة
 
-### التغييرات:
+### 1. تعديل `supabase/functions/import-text-questions/index.ts`
 
-**1. اضافة console.log لطباعة اسماء الاعمدة الفعلية (سطر 157-158)**
+**اضافة عداد للسجلات غير الصالحة + تحقق قبل كشف التكرار (سطر 66-69):**
 ```typescript
-console.log("Excel headers (raw):", excelHeaders);
-console.log("Excel headers (normalized):", excelHeaders.map(normalizeColumnName));
+let importedCount = 0;
+let skippedCount = 0;
+let invalidCount = 0;
+
+for (const q of questions) {
+  // Skip rows with empty question_text
+  if (!q.question_text || q.question_text.toString().trim() === '') {
+    invalidCount++;
+    continue;
+  }
 ```
 
-**2. توسيع `COLUMN_MAP` لدعم الاسماء الانجليزية (اسطر 51-70)**
-اضافة مفاتيح انجليزية بجانب العربية:
-- `"subject"` -> `subject`
-- `"grade"` -> `grade`
-- `"term"`, `"semester"` -> `semester`
-- `"question number"`, `"question_number"` -> `question_number`
-- `"question text"`, `"question_text"` -> `question_text`
-- `"option a"`, `"option_a"` -> `option_a` (وكذلك b, c, d)
-- `"correct answer"`, `"correct_answer"` -> `correct_answer`
-- `"passage id"`, `"passage_id"` -> (يتم تجاهلها حاليا حسب الطلب)
-- `"passage text"`, `"passage_text"` -> (يتم تجاهلها حاليا)
-- `"question type"`, `"question_type"` -> `question_type`
-- `"notes"` -> `notes`
-- `"correct answer text"`, `"correct_answer_text"` -> `correct_answer_text`
+**تعديل فحص التكرار ليستثني السجلات الفارغة (سطر 71-78):**
+اضافة شرط `.neq("question_text", "")` و `.not("question_text", "is", null)` لاستعلام كشف التكرار حتى لا يتم مقارنة الاسئلة الجديدة بسجلات فارغة موجودة.
 
-**3. تحسين `normalizeColumnName` لتشمل lowercase**
-اضافة `.toLowerCase()` للتعامل مع اختلاف حالة الاحرف الانجليزية.
+**تعديل الاستجابة لتشمل invalidCount (سطر 113):**
+```typescript
+JSON.stringify({ importedCount, skippedCount, invalidCount })
+```
 
-**4. تحسين `buildHeaderMapping` بمطابقة مرنة**
-اذا لم يتم العثور على تطابق تام، يتم تجربة:
-- تطابق "يبدا بـ" (startsWith)
-- تطابق "يحتوي على" (includes)
-
-مع طباعة النتيجة النهائية في console.
+### 2. تنظيف السجلات الفارغة من قاعدة البيانات
+تنفيذ استعلام حذف مباشر:
+```sql
+DELETE FROM text_question_bank
+WHERE question_text IS NULL OR question_text = '';
+```
 
 ### النتيجة المتوقعة
-عند تحميل ملف Excel بأعمدة انجليزية او عربية، ستظهر القيم الصحيحة في المعاينة: رقم السؤال الحقيقي، نص السؤال، الخيارات، والاجابة الصحيحة.
-
+- السجلات ذات question_text الفارغ لن تُعتبر تكرارات
+- السجلات الفارغة الموجودة ستُحذف من قاعدة البيانات
+- الاسئلة الـ 234 ستُستورد بنجاح
