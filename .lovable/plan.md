@@ -1,52 +1,57 @@
 
-# اصلاح منطق كشف التكرار في دالة استيراد الاسئلة النصية
+
+# اصلاح مطابقة رقم السؤال في صفحة استيراد الاسئلة النصية
 
 ## المشكلة
-فحص التكرار الحالي (سطر 78-87) يطابق على `subject + grade + semester + question_number` فقط **بدون** `question_text`. هذا يعني ان اي سؤالين يحملان نفس رقم السؤال في نفس المادة والصف والفصل يعتبران متكررين حتى لو كان نص السؤال مختلفا تماما.
+في السطر 211، يتم تحويل رقم السؤال بـ `Number(mapped.question_number) || 0` مما يعطي 0 دائما اذا لم يتم العثور على العمود. والسبب ان COLUMN_MAP لا يحتوي على جميع الاسماء المحتملة لعمود رقم السؤال في ملفات Excel العربية.
 
-بالاضافة لذلك، يستخدم `.maybeSingle()` الذي يسبب خطا اذا وجد اكثر من تطابق.
+## التغييرات (ملف واحد فقط)
 
-## الحل
-تغيير منطق كشف التكرار ليكون مركبا من 5 حقول: `subject + grade + semester + question_number + question_text`
+### `src/pages/system/ImportTextQuestions.tsx`
 
-### التغييرات في ملف واحد: `supabase/functions/import-text-questions/index.ts`
+**1. اضافة اسماء اعمدة جديدة في COLUMN_MAP (حوالي سطر 56-76):**
 
-1. **استبدال فحص التكرار الفردي بفحص مجمع مسبق:**
-   - قبل حلقة الادراج، جلب جميع السجلات الموجودة التي تطابق المادة والصف والفصل
-   - بناء مجموعة (Set) من المفاتيح المركبة: `subject|grade|semester|question_number|question_text`
-   - هذا اسرع بكثير من استعلام لكل سؤال
+اضافة هذه المفاتيح الجديدة:
+- `"question number"` - موجود بالفعل
+- `"question id"` - جديد
+- `"رقم"` - جديد
+- `"question number in book"` - جديد
 
-2. **داخل الحلقة:**
-   - توليد مفتاح مركب لكل سؤال جديد
-   - فحص وجوده في المجموعة
-   - اذا موجود: تخطي مع رسالة log توضح السبب
-   - اذا غير موجود: ادراج + اضافة المفتاح للمجموعة (لمنع تكرار داخل نفس الدفعة)
+ملاحظة: `"رقم السوال"` موجود بالفعل في السطر 56 (بعد ازالة التشكيل تصبح "رقم السوال" وهي تطابق "رقم السؤال").
 
-3. **اضافة console.log عند التخطي:**
-   - طباعة المفتاح المركب والسبب عند تخطي سؤال مكرر
+**2. تعديل منطق التحويل في سطر 211:**
 
-## التفاصيل التقنية
-
-المنطق الجديد (مفهوميا):
-
-```text
-// قبل الحلقة
-جلب السجلات الموجودة بنفس المادة من text_question_bank
-بناء Set من المفاتيح: "subject|grade|semester|question_number|question_text"
-
-// داخل الحلقة لكل سؤال
-key = "subject|grade|semester|question_number|question_text"
-اذا key موجود في Set:
-  console.log("Skipping duplicate:", key)
-  skippedCount++
-والا:
-  ادراج السؤال
-  اضافة key الى Set
+تغيير من:
+```
+question_number: Number(mapped.question_number) || 0,
 ```
 
-هذا يضمن ادراج جميع الـ 235 سؤال طالما انها فريدة بالمفتاح المركب الكامل.
+الى:
+```typescript
+question_number: (() => {
+  const raw = mapped.question_number;
+  if (raw === undefined || raw === null || String(raw).trim() === '') return null;
+  const parsed = parseInt(String(raw), 10);
+  return isNaN(parsed) ? null : parsed;
+})(),
+```
 
-## ما لن يتغير
-- لا تعديل على بنية قاعدة البيانات
-- لا تعديل على منطق المصادقة او التحقق من الصلاحيات
-- لا تعديل على ملف ImportTextQuestions.tsx
+**3. تحديث نوع ParsedTextQuestion (سطر 20):**
+
+تغيير `question_number: number` الى `question_number: number | null` للسماح بقيمة null عند فشل التحويل.
+
+**4. تحديث عرض المعاينة (سطر 397):**
+
+تغيير من:
+```
+<TableCell>{q.question_number}</TableCell>
+```
+الى:
+```
+<TableCell>{q.question_number !== null ? q.question_number : <span className="text-red-500">خطأ</span>}</TableCell>
+```
+
+## النتيجة
+- المعاينة تعرض ارقام الاسئلة الحقيقية (1, 2, 3, ...) بدل 0
+- اذا فشل التحويل يظهر "خطأ" بالاحمر بدل 0
+- لا تغيير على قاعدة البيانات او منطق التكرار
