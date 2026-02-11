@@ -259,10 +259,15 @@ const ExamAnalytics = () => {
             <h2 className="text-2xl font-bold">تحليلات الاختبار</h2>
             <p className="text-muted-foreground mt-1">{examName}</p>
           </div>
-          <Button variant="outline" onClick={() => navigate("/teacher/analytics")}>
-            <ArrowRight className="ml-2 h-4 w-4" />
-            رجوع
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="default" onClick={() => navigate(`/teacher/exam-report/${examId}`)}>
+              طباعة التقرير
+            </Button>
+            <Button variant="outline" onClick={() => navigate("/teacher/analytics")}>
+              <ArrowRight className="ml-2 h-4 w-4" />
+              رجوع
+            </Button>
+          </div>
         </div>
 
         {totalStudents === 0 ? (

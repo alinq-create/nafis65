@@ -18,6 +18,8 @@ import CreateNewExam from "./pages/teacher/CreateNewExam";
 import ReviewAttempts from "./pages/teacher/ReviewAttempts";
 import TeacherAnalytics from "./pages/teacher/TeacherAnalytics";
 import ExamAnalytics from "./pages/teacher/ExamAnalytics";
+import ExamReport from "./pages/teacher/ExamReport";
+import StudentReport from "./pages/teacher/StudentReport";
 import StudentsList from "./pages/teacher/StudentsList";
 import StudentProfile from "./pages/teacher/StudentProfile";
 import StudentEntry from "./pages/student/StudentEntry";
@@ -57,6 +59,8 @@ const App = () => (
             <Route path="/teacher/exam-analytics/:examId" element={<ProtectedRoute requiredRole="teacher"><ExamAnalytics /></ProtectedRoute>} />
             <Route path="/teacher/students" element={<ProtectedRoute requiredRole="teacher"><StudentsList /></ProtectedRoute>} />
             <Route path="/teacher/students/:name/:class" element={<ProtectedRoute requiredRole="teacher"><StudentProfile /></ProtectedRoute>} />
+            <Route path="/teacher/exam-report/:examId" element={<ProtectedRoute requiredRole="teacher"><ExamReport /></ProtectedRoute>} />
+            <Route path="/teacher/student-report/:name/:class" element={<ProtectedRoute requiredRole="teacher"><StudentReport /></ProtectedRoute>} />
             
             {/* System Admin Routes */}
             <Route path="/system" element={<ProtectedRoute requiredRole="system_admin"><SystemDashboard /></ProtectedRoute>} />
