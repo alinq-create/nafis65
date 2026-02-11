@@ -17,7 +17,7 @@ interface ParsedTextQuestion {
   subject: string;
   grade: string;
   semester: string;
-  question_number: number;
+  question_number: number | null;
   question_type: string;
   question_text: string;
   option_a: string;
@@ -74,6 +74,9 @@ const COLUMN_MAP: Record<string, keyof ParsedTextQuestion> = {
   "term": "semester",
   "semester": "semester",
   "question number": "question_number",
+  "question id": "question_number",
+  "رقم": "question_number",
+  "question number in book": "question_number",
   "question text": "question_text",
   "option a": "option_a",
   "option b": "option_b",
@@ -208,7 +211,12 @@ const ImportTextQuestions = () => {
           subject: fixedSubject!,
           grade: normalizeGrade(rawGrade),
           semester: rawSemester ? normalizeSemester(rawSemester) : "غير محدد",
-          question_number: Number(mapped.question_number) || 0,
+          question_number: (() => {
+            const raw = mapped.question_number;
+            if (raw === undefined || raw === null || String(raw).trim() === '') return null;
+            const parsed = parseInt(String(raw), 10);
+            return isNaN(parsed) ? null : parsed;
+          })(),
           question_type: "اختيار متعدد",
           question_text: String(mapped.question_text || ""),
           option_a: String(mapped.option_a || ""),
@@ -394,7 +402,7 @@ const ImportTextQuestions = () => {
                   <TableBody>
                     {parsedQuestions.map((q, i) => (
                       <TableRow key={i}>
-                        <TableCell>{q.question_number}</TableCell>
+                        <TableCell>{q.question_number !== null ? q.question_number : <span className="text-destructive">خطأ</span>}</TableCell>
                         <TableCell className="max-w-[300px] truncate">
                           {q.question_text.length > 50
                             ? q.question_text.substring(0, 50) + "..."
