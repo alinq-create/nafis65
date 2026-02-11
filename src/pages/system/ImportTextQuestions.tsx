@@ -36,8 +36,8 @@ interface ImportReport {
 
 /* ─── Column normalisation (same pattern as ImportQuestionBank) ─── */
 
-function normalizeColumnName(raw: string): string {
-  let s = raw.trim();
+function normalizeColumnName(raw: any): string {
+  let s = (raw ?? "").toString().trim().toLowerCase();
   s = s.replace(/_/g, " ");
   s = s.replace(/[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E4\u06E7\u06E8\u06EA-\u06ED]/g, "");
   s = s.replace(/[أإآٱ]/g, "ا");
@@ -49,6 +49,7 @@ function normalizeColumnName(raw: string): string {
 }
 
 const COLUMN_MAP: Record<string, keyof ParsedTextQuestion> = {
+  // Arabic
   "المادة": "subject",
   "الصف": "grade",
   "الفصل الدراسي": "semester",
@@ -67,16 +68,49 @@ const COLUMN_MAP: Record<string, keyof ParsedTextQuestion> = {
   "نص الاجابة الصحيحة": "correct_answer_text",
   "ملاحظات": "notes",
   "تحذير": "notes",
+  // English
+  "subject": "subject",
+  "grade": "grade",
+  "term": "semester",
+  "semester": "semester",
+  "question number": "question_number",
+  "question text": "question_text",
+  "option a": "option_a",
+  "option b": "option_b",
+  "option c": "option_c",
+  "option d": "option_d",
+  "correct answer": "correct_answer",
+  "correct answer text": "correct_answer_text",
+  "question type": "question_type",
+  "notes": "notes",
+  "passage id": "notes",   // ignored for now, mapped to notes as placeholder
+  "passage text": "notes", // ignored for now
 };
 
 function buildHeaderMapping(headers: string[]): Record<string, keyof ParsedTextQuestion> {
   const mapping: Record<string, keyof ParsedTextQuestion> = {};
+  const mapKeys = Object.keys(COLUMN_MAP);
+
   for (const header of headers) {
     const normalised = normalizeColumnName(header);
+
+    // 1. Exact match
     if (COLUMN_MAP[normalised]) {
       mapping[header] = COLUMN_MAP[normalised];
+      continue;
+    }
+
+    // 2. Flexible: startsWith or includes
+    let found = mapKeys.find((k) => normalised.startsWith(k) || k.startsWith(normalised));
+    if (!found) {
+      found = mapKeys.find((k) => normalised.includes(k) || k.includes(normalised));
+    }
+    if (found) {
+      mapping[header] = COLUMN_MAP[found];
     }
   }
+
+  console.log("Header mapping result:", mapping);
   return mapping;
 }
 
@@ -155,6 +189,8 @@ const ImportTextQuestions = () => {
       }
 
       const excelHeaders = Object.keys(rows[0]);
+      console.log("Excel headers (raw):", excelHeaders);
+      console.log("Excel headers (normalized):", excelHeaders.map(normalizeColumnName));
       const headerMap = buildHeaderMapping(excelHeaders);
 
       const questions: ParsedTextQuestion[] = rows.map((row) => {
