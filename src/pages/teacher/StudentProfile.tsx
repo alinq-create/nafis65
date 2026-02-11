@@ -238,11 +238,16 @@ const StudentProfile = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6" dir="rtl">
-        {/* Back button */}
-        <Button variant="ghost" onClick={() => navigate("/teacher/students")} className="gap-2">
-          <ArrowRight className="h-4 w-4" />
-          العودة للقائمة
-        </Button>
+        {/* Back button + Print */}
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" onClick={() => navigate("/teacher/students")} className="gap-2">
+            <ArrowRight className="h-4 w-4" />
+            العودة للقائمة
+          </Button>
+          <Button variant="default" onClick={() => navigate(`/teacher/student-report/${encodeURIComponent(studentName)}/${classNum}`)}>
+            طباعة تقرير الطالبة
+          </Button>
+        </div>
 
         {/* Header Summary */}
         <Card>
