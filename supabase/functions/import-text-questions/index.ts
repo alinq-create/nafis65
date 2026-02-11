@@ -65,9 +65,16 @@ Deno.serve(async (req) => {
 
     let importedCount = 0;
     let skippedCount = 0;
+    let invalidCount = 0;
 
     for (const q of questions) {
-      // Check for duplicate
+      // Skip rows with empty question_text
+      if (!q.question_text || q.question_text.toString().trim() === '') {
+        invalidCount++;
+        continue;
+      }
+
+      // Check for duplicate (exclude empty records)
       const { data: existing } = await adminClient
         .from("text_question_bank")
         .select("id")
@@ -75,6 +82,8 @@ Deno.serve(async (req) => {
         .eq("grade", q.grade)
         .eq("semester", q.semester)
         .eq("question_number", q.question_number)
+        .neq("question_text", "")
+        .not("question_text", "is", null)
         .maybeSingle();
 
       if (existing) {
@@ -111,7 +120,7 @@ Deno.serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ importedCount, skippedCount }),
+      JSON.stringify({ importedCount, skippedCount, invalidCount }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
