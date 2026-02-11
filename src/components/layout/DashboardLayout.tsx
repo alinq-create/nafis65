@@ -27,6 +27,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
     { path: "/teacher/questions", label: "بنك الأسئلة", icon: BookOpen },
     { path: "/teacher/exams", label: "الاختبارات", icon: FileText },
     { path: "/teacher/attempts", label: "المحاولات", icon: ClipboardCheck },
+    { path: "/teacher/students", label: "الطالبات", icon: Users },
     { path: "/teacher/analytics", label: "التحليلات", icon: BarChart3 },
   ];
 
