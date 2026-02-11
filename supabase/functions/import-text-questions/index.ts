@@ -67,6 +67,33 @@ Deno.serve(async (req) => {
     let skippedCount = 0;
     let invalidCount = 0;
 
+    // Collect unique subjects from the batch to pre-fetch existing records
+    const subjects = [...new Set(questions.map((q: any) => q.subject).filter(Boolean))];
+    
+    // Pre-fetch all existing records for these subjects and build a Set of composite keys
+    const existingKeys = new Set<string>();
+    for (const subj of subjects) {
+      let allRows: any[] = [];
+      let from = 0;
+      const pageSize = 1000;
+      while (true) {
+        const { data } = await adminClient
+          .from("text_question_bank")
+          .select("subject, grade, semester, question_number, question_text")
+          .eq("subject", subj)
+          .range(from, from + pageSize - 1);
+        if (!data || data.length === 0) break;
+        allRows = allRows.concat(data);
+        if (data.length < pageSize) break;
+        from += pageSize;
+      }
+      for (const row of allRows) {
+        const key = `${row.subject}|${row.grade}|${row.semester}|${row.question_number}|${row.question_text}`;
+        existingKeys.add(key);
+      }
+    }
+    console.log(`Pre-fetched ${existingKeys.size} existing composite keys`);
+
     for (const q of questions) {
       // Skip rows with empty question_text
       if (!q.question_text || q.question_text.toString().trim() === '') {
@@ -74,19 +101,10 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // Check for duplicate (exclude empty records)
-      const { data: existing } = await adminClient
-        .from("text_question_bank")
-        .select("id")
-        .eq("subject", q.subject)
-        .eq("grade", q.grade)
-        .eq("semester", q.semester)
-        .eq("question_number", q.question_number)
-        .neq("question_text", "")
-        .not("question_text", "is", null)
-        .maybeSingle();
+      const compositeKey = `${q.subject}|${q.grade}|${q.semester}|${q.question_number}|${q.question_text}`;
 
-      if (existing) {
+      if (existingKeys.has(compositeKey)) {
+        console.log("Skipping duplicate:", compositeKey);
         skippedCount++;
         continue;
       }
@@ -116,6 +134,7 @@ Deno.serve(async (req) => {
         skippedCount++;
       } else {
         importedCount++;
+        existingKeys.add(compositeKey); // Prevent intra-batch duplicates
       }
     }
 
