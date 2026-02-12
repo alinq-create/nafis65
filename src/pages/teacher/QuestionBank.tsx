@@ -5,9 +5,11 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { Trash2 } from "lucide-react";
 import ImageCropEditor from "@/components/teacher/ImageCropEditor";
 
 interface UnifiedQuestion {
@@ -40,6 +42,7 @@ const QuestionBank = () => {
   const [questions, setQuestions] = useState<UnifiedQuestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingQuestion, setEditingQuestion] = useState<UnifiedQuestion | null>(null);
+  const [deletingQuestion, setDeletingQuestion] = useState<UnifiedQuestion | null>(null);
   const { toast } = useToast();
 
   const fetchQuestions = async () => {
@@ -60,26 +63,16 @@ const QuestionBank = () => {
     fetchQuestions();
   }, [authUser]);
 
-  const handleToggleVisibility = async (question: UnifiedQuestion) => {
+  const handleDeleteQuestion = async (question: UnifiedQuestion) => {
     const table = question.source === 'image' ? 'question_bank' : 'text_question_bank';
-    const newValue = !question.visible_to_students;
-    setQuestions(prev => prev.map(q =>
-      q.id === question.id && q.source === question.source
-        ? { ...q, visible_to_students: newValue }
-        : q
-    ));
-    const { error } = await supabase
-      .from(table)
-      .update({ visible_to_students: newValue } as any)
-      .eq("id", question.id);
+    const { error } = await supabase.from(table).delete().eq("id", question.id);
     if (error) {
-      setQuestions(prev => prev.map(q =>
-        q.id === question.id && q.source === question.source
-          ? { ...q, visible_to_students: !newValue }
-          : q
-      ));
-      toast({ title: "فشل تحديث حالة الظهور", variant: "destructive" });
+      toast({ title: "فشل حذف السؤال", variant: "destructive" });
+    } else {
+      setQuestions(prev => prev.filter(q => !(q.id === question.id && q.source === question.source)));
+      toast({ title: "تم حذف السؤال بنجاح" });
     }
+    setDeletingQuestion(null);
   };
 
   const getImageUrl = (question: UnifiedQuestion) => {
@@ -150,7 +143,7 @@ const QuestionBank = () => {
                     <TableHead className="text-right">النوع</TableHead>
                     <TableHead className="text-right">الإجابة</TableHead>
                     <TableHead className="text-right">معاينة</TableHead>
-                    <TableHead className="text-right w-[80px]">يظهر للطالبات</TableHead>
+                    <TableHead className="text-right w-[60px]">حذف</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -191,10 +184,14 @@ const QuestionBank = () => {
                         )}
                       </TableCell>
                       <TableCell>
-                        <Switch
-                          checked={q.visible_to_students}
-                          onCheckedChange={() => handleToggleVisibility(q)}
-                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setDeletingQuestion(q)}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -226,6 +223,26 @@ const QuestionBank = () => {
           )}
         </DialogContent>
       </Dialog>
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deletingQuestion} onOpenChange={(open) => !open && setDeletingQuestion(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>حذف السؤال</AlertDialogTitle>
+            <AlertDialogDescription>
+              هل أنتِ متأكدة من حذف السؤال رقم {deletingQuestion?.question_number}؟ لا يمكن التراجع عن هذا الإجراء.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deletingQuestion && handleDeleteQuestion(deletingQuestion)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              تأكيد الحذف
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardLayout>
   );
 };
