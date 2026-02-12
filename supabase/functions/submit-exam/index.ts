@@ -1,6 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+function normalizeArabic(text: string): string {
+  if (!text) return "";
+  return text.replace(/[أإآٱ]/g, "ا");
+}
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -71,7 +76,7 @@ serve(async (req) => {
     const studentAnswers = answers.map((a: any) => {
       const correct = correctMap.get(a.questionId);
       const isCorrect = correct
-        ? a.answer?.trim().toLowerCase() === correct.correct_answer?.trim().toLowerCase()
+        ? normalizeArabic(a.answer?.trim().toLowerCase()) === normalizeArabic(correct.correct_answer?.trim().toLowerCase())
         : false;
       if (isCorrect) correctCount++;
 
