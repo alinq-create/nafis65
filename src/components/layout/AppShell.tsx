@@ -4,9 +4,10 @@ interface AppShellProps {
   children: React.ReactNode;
   hideHeader?: boolean;
   hideFooter?: boolean;
+  headerExtra?: React.ReactNode;
 }
 
-const AppShell = ({ children, hideHeader = false, hideFooter = false }: AppShellProps) => {
+const AppShell = ({ children, hideHeader = false, hideFooter = false, headerExtra }: AppShellProps) => {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       {/* Header */}
@@ -22,6 +23,7 @@ const AppShell = ({ children, hideHeader = false, hideFooter = false }: AppShell
               <h1 className="text-lg font-bold leading-tight text-primary-foreground">منصة تدريب نافس</h1>
               <p className="text-sm opacity-90">المتوسطة الخامسة والستون</p>
             </div>
+            {headerExtra && <div className="ml-auto">{headerExtra}</div>}
           </div>
         </header>
       }

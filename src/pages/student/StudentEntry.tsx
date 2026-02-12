@@ -150,24 +150,26 @@ const StudentEntry = () => {
 
   }
 
-  return (
-    <AppShell>
-      <div className="relative flex flex-1 items-center justify-center p-4">
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={() => navigate("/login")}
-                className="absolute top-4 left-4 z-10 p-2.5 rounded-full border border-border/50 bg-background/80 backdrop-blur-sm text-muted-foreground hover:text-primary hover:border-primary/50 hover:bg-primary/5 transition-all duration-300 shadow-sm hover:shadow-md">
+  const loginButton = (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            onClick={() => navigate("/login")}
+            className="p-2.5 rounded-full text-white/80 hover:text-white hover:bg-white/20 transition-all duration-300">
+            <LogIn className="h-5 w-5" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">
+          <p>دخول المديرة والمعلمات</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
 
-                <LogIn className="h-5 w-5" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              <p>دخول المعلمات والمديرات</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+  return (
+    <AppShell headerExtra={loginButton}>
+      <div className="flex flex-1 items-center justify-center p-4">
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
             <img src={nafisLogo} alt="شعار نافس" className="h-28 mx-auto mb-4 object-contain" />
