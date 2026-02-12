@@ -101,8 +101,7 @@ const CreateNewExam = () => {
     if (error) {
       toast({ title: "خطأ في جلب الأسئلة", variant: "destructive" });
     }
-    const visible = ((data as UnifiedQuestion[]) ?? []).filter((q) => q.visible_to_students);
-    setQuestions(visible);
+    setQuestions((data as UnifiedQuestion[]) ?? []);
     setQuestionsLoading(false);
   };
 
