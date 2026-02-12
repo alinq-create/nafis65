@@ -1,0 +1,1 @@
+CREATE POLICY "teachers_delete_text_questions" ON public.text_question_bank FOR DELETE USING (is_teacher());

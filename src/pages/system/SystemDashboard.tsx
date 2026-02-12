@@ -1,32 +1,11 @@
-import { useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useNavigate } from "react-router-dom";
-import { Upload, FileText, Trash2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
+import { Upload, FileText } from "lucide-react";
 
 const SystemDashboard = () => {
   const navigate = useNavigate();
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [deleting, setDeleting] = useState(false);
 
-  const handleDeleteLughati = async () => {
-    setDeleting(true);
-    const { error, count } = await supabase
-      .from("text_question_bank")
-      .delete({ count: "exact" })
-      .eq("subject", "لغتي");
-    setDeleting(false);
-    setShowDeleteDialog(false);
-    if (error) {
-      toast.error("حدث خطأ أثناء الحذف: " + error.message);
-    } else {
-      toast.success(`تم حذف ${count ?? 0} سؤال من أسئلة لغتي بنجاح`);
-    }
-  };
   const cards = [
     {
       title: "استيراد بنك الأسئلة (رياضيات)",
@@ -78,34 +57,6 @@ const SystemDashboard = () => {
             );
           })}
         </div>
-
-        <div className="pt-4 border-t">
-          <Button
-            variant="destructive"
-            onClick={() => setShowDeleteDialog(true)}
-            className="gap-2"
-          >
-            <Trash2 className="h-4 w-4" />
-            حذف جميع أسئلة لغتي
-          </Button>
-        </div>
-
-        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
-              <AlertDialogDescription>
-                سيتم حذف جميع أسئلة مادة لغتي من بنك الأسئلة النصية. لا يمكن التراجع عن هذا الإجراء.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={deleting}>إلغاء</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDeleteLughati} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                {deleting ? "جاري الحذف..." : "تأكيد الحذف"}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
       </div>
     </DashboardLayout>
   );
