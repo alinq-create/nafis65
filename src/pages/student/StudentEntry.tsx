@@ -14,7 +14,7 @@ interface AvailableExam {
   exam_name: string;
 }
 
-const SUBJECTS = ["رياضيات", "علوم", "لغة عربية"];
+const SUBJECTS = ["رياضيات", "علوم", "لغتي"];
 
 const StudentEntry = () => {
   const [studentName, setStudentName] = useState("");
