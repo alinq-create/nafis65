@@ -40,15 +40,15 @@ const StudentEntry = () => {
         body: {
           studentName: studentName.trim(),
           classNumber: parseInt(classNumber),
-          subject,
-        },
+          subject
+        }
       });
 
       if (error || data?.error) {
         toast({
           title: "تنبيه",
           description: data?.error || "لا يمكن الوصول للاختبار",
-          variant: "destructive",
+          variant: "destructive"
         });
         return;
       }
@@ -60,8 +60,8 @@ const StudentEntry = () => {
             examName: data.examName,
             studentName: studentName.trim(),
             classNumber: parseInt(classNumber),
-            questions: data.questions,
-          },
+            questions: data.questions
+          }
         });
         return;
       }
@@ -84,15 +84,15 @@ const StudentEntry = () => {
           studentName: studentName.trim(),
           classNumber: parseInt(classNumber),
           subject,
-          examId,
-        },
+          examId
+        }
       });
 
       if (error || data?.error) {
         toast({
           title: "خطأ",
           description: data?.error || "لا يمكن الوصول للاختبار",
-          variant: "destructive",
+          variant: "destructive"
         });
         return;
       }
@@ -103,8 +103,8 @@ const StudentEntry = () => {
           examName: data.examName,
           studentName: studentName.trim(),
           classNumber: parseInt(classNumber),
-          questions: data.questions,
-        },
+          questions: data.questions
+        }
       });
     } catch {
       toast({ title: "حدث خطأ", variant: "destructive" });
@@ -125,18 +125,18 @@ const StudentEntry = () => {
             </div>
 
             <div className="space-y-3">
-              {availableExams.map((exam) => (
-                <Card
-                  key={exam.id}
-                  className="cursor-pointer hover:border-primary transition-colors shadow-sm"
-                  onClick={() => handleExamSelect(exam.id)}
-                >
+              {availableExams.map((exam) =>
+              <Card
+                key={exam.id}
+                className="cursor-pointer hover:border-primary transition-colors shadow-sm"
+                onClick={() => handleExamSelect(exam.id)}>
+
                   <CardContent className="flex items-center justify-between p-5">
                     <span className="font-medium text-lg">{exam.exam_name}</span>
                     <ArrowRight className="h-5 w-5 text-muted-foreground" />
                   </CardContent>
                 </Card>
-              ))}
+              )}
             </div>
 
             <div className="text-center mt-6">
@@ -146,8 +146,8 @@ const StudentEntry = () => {
             </div>
           </div>
         </div>
-      </AppShell>
-    );
+      </AppShell>);
+
   }
 
   return (
@@ -158,8 +158,8 @@ const StudentEntry = () => {
             <TooltipTrigger asChild>
               <button
                 onClick={() => navigate("/login")}
-                className="absolute top-4 left-4 z-10 p-2.5 rounded-full border border-border/50 bg-background/80 backdrop-blur-sm text-muted-foreground hover:text-primary hover:border-primary/50 hover:bg-primary/5 transition-all duration-300 shadow-sm hover:shadow-md"
-              >
+                className="absolute top-4 left-4 z-10 p-2.5 rounded-full border border-border/50 bg-background/80 backdrop-blur-sm text-muted-foreground hover:text-primary hover:border-primary/50 hover:bg-primary/5 transition-all duration-300 shadow-sm hover:shadow-md">
+
                 <LogIn className="h-5 w-5" />
               </button>
             </TooltipTrigger>
@@ -171,7 +171,7 @@ const StudentEntry = () => {
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
             <img src={nafisLogo} alt="شعار نافس" className="h-28 mx-auto mb-4 object-contain" />
-            <h1 className="text-3xl font-bold text-foreground">منصة تدريب نافس</h1>
+            <h1 className="text-3xl font-bold text-primary">منصة تدريب نافس</h1>
             <p className="text-muted-foreground mt-2">أدخلي بياناتك للبدء بالاختبار</p>
           </div>
 
@@ -187,8 +187,8 @@ const StudentEntry = () => {
                     value={studentName}
                     onChange={(e) => setStudentName(e.target.value)}
                     placeholder="أدخلي اسمك الكامل"
-                    required
-                  />
+                    required />
+
                 </div>
 
                 <div className="space-y-2">
@@ -198,11 +198,11 @@ const StudentEntry = () => {
                       <SelectValue placeholder="اختاري رقم الفصل" />
                     </SelectTrigger>
                     <SelectContent>
-                      {Array.from({ length: 10 }, (_, i) => (
-                        <SelectItem key={i + 1} value={String(i + 1)}>
+                      {Array.from({ length: 10 }, (_, i) =>
+                      <SelectItem key={i + 1} value={String(i + 1)}>
                           فصل {i + 1}
                         </SelectItem>
-                      ))}
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -214,11 +214,11 @@ const StudentEntry = () => {
                       <SelectValue placeholder="اختاري المادة" />
                     </SelectTrigger>
                     <SelectContent>
-                      {SUBJECTS.map((s) => (
-                        <SelectItem key={s} value={s}>
+                      {SUBJECTS.map((s) =>
+                      <SelectItem key={s} value={s}>
                           {s}
                         </SelectItem>
-                      ))}
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -232,8 +232,8 @@ const StudentEntry = () => {
 
         </div>
       </div>
-    </AppShell>
-  );
+    </AppShell>);
+
 };
 
 export default StudentEntry;
