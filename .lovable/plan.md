@@ -1,51 +1,59 @@
 
 
-# Fix question_number mapping collision
+# Fix: منع التطابق المرن من الكتابة فوق الحقول المطابقة مسبقا
 
-## Root Cause
+## السبب الجذري
 
-The Excel file contains three columns that ALL map to `question_number` in the COLUMN_MAP:
+من الصورة المرفوعة نرى ان ملف Excel يحتوي على 3 اعمدة متشابهة:
+- `question_number` (العمود F) - يحتوي ارقام صحيحة: 1, 2, 3...
+- `question_id` (العمود G) - يحتوي رموز: Q1, Q2...
+- `question_number_in_book` (العمود H) - يحتوي رموز: 1-1-1م...
 
-| Excel Column | Example Value | Numeric? |
-|---|---|---|
-| question_number | 1, 2, 3... | Yes |
-| question_id | Q1, Q2, Q3... | No |
-| question_number_in_book | n1-m1-1 | No |
+المشكلة في دالة `buildHeaderMapping` (سطر 104-106): التطابق المرن (`includes`) يجعل عمود `question_number_in_book` يطابق مفتاح `"question number"` لان `"question number in book".includes("question number")` يعطي `true`. وبما ان هذا العمود يأتي بعد `question_number` في الحلقة، فانه يكتب فوق القيمة الصحيحة.
 
-When the mapping loop runs, the last column processed overwrites the earlier ones. So `question_number_in_book` (value: "n1-m1-1") overwrites the real `question_number` (value: 1), and parseInt("n1-m1-1") returns NaN, resulting in null/"خطأ".
+## الحل (ملف واحد: `src/pages/system/ImportTextQuestions.tsx`)
 
-## Fix (single file: `src/pages/system/ImportTextQuestions.tsx`)
+### تعديل دالة `buildHeaderMapping` (سطر 90-115)
 
-### 1. Remove conflicting mappings from COLUMN_MAP (lines 77-79)
+اضافة `Set` لتتبع الحقول التي تم تعيينها بتطابق تام، ومنع التطابق المرن من الكتابة فوقها:
 
-Remove these three lines that were added in the last edit:
-- `"question id": "question_number"` -- these are IDs like Q1, not numbers
-- `"رقم": "question_number"` -- too generic, could collide
-- `"question number in book": "question_number"` -- contains non-numeric codes
+```typescript
+function buildHeaderMapping(headers: string[]) {
+  const mapping: Record<string, keyof ParsedTextQuestion> = {};
+  const mapKeys = Object.keys(COLUMN_MAP);
+  const assignedFields = new Set<string>();
 
-Keep only `"question number": "question_number"` (line 76) and `"رقم السوال": "question_number"` (line 56).
+  for (const header of headers) {
+    const normalised = normalizeColumnName(header);
 
-### 2. Update parsing to prefer first valid numeric value (lines 214-219)
+    // 1. Exact match - always wins
+    if (COLUMN_MAP[normalised]) {
+      mapping[header] = COLUMN_MAP[normalised];
+      assignedFields.add(COLUMN_MAP[normalised]);
+      continue;
+    }
 
-Instead of relying on a single mapped field, scan ALL columns that could contain a question number and use the first valid integer found:
-
-```
-question_number: (() => {
-  // Try the mapped value first
-  const raw = mapped.question_number;
-  if (raw !== undefined && raw !== null) {
-    const parsed = parseInt(String(raw), 10);
-    if (!isNaN(parsed)) return parsed;
+    // 2. Flexible match - only if field not already assigned
+    let found = mapKeys.find((k) => normalised.startsWith(k) || k.startsWith(normalised));
+    if (!found) {
+      found = mapKeys.find((k) => normalised.includes(k) || k.includes(normalised));
+    }
+    if (found) {
+      const fieldName = COLUMN_MAP[found];
+      if (!assignedFields.has(fieldName)) {
+        mapping[header] = fieldName;
+      }
+    }
   }
-  return null;
-})(),
+
+  console.log("Header mapping result:", mapping);
+  return mapping;
+}
 ```
 
-This is already correct -- the real fix is just removing the conflicting mappings so the correct column value isn't overwritten.
-
-## Summary
-
-- Remove 3 lines from COLUMN_MAP (lines 77-79)
-- The existing parsing logic at lines 214-219 is already correct and needs no change
-- Result: question_number column (with values 1, 2, 3...) will be correctly mapped without being overwritten
+## النتيجة
+- عمود `question_number` يطابق تماما مع `"question number"` ويسجل الحقل في `assignedFields`
+- عمود `question_number_in_book` يحاول التطابق المرن لكن يجد ان `question_number` مسجل مسبقا فيتم تجاهله
+- ارقام الاسئلة تظهر صحيحة (1, 2, 3...) في المعاينة
+- لا تغيير على قاعدة البيانات
 
