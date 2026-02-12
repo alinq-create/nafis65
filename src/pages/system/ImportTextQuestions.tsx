@@ -90,23 +90,28 @@ const COLUMN_MAP: Record<string, keyof ParsedTextQuestion> = {
 function buildHeaderMapping(headers: string[]): Record<string, keyof ParsedTextQuestion> {
   const mapping: Record<string, keyof ParsedTextQuestion> = {};
   const mapKeys = Object.keys(COLUMN_MAP);
+  const assignedFields = new Set<string>();
 
   for (const header of headers) {
     const normalised = normalizeColumnName(header);
 
-    // 1. Exact match
+    // 1. Exact match - always wins
     if (COLUMN_MAP[normalised]) {
       mapping[header] = COLUMN_MAP[normalised];
+      assignedFields.add(COLUMN_MAP[normalised]);
       continue;
     }
 
-    // 2. Flexible: startsWith or includes
+    // 2. Flexible match - only if field not already assigned
     let found = mapKeys.find((k) => normalised.startsWith(k) || k.startsWith(normalised));
     if (!found) {
       found = mapKeys.find((k) => normalised.includes(k) || k.includes(normalised));
     }
     if (found) {
-      mapping[header] = COLUMN_MAP[found];
+      const fieldName = COLUMN_MAP[found];
+      if (!assignedFields.has(fieldName)) {
+        mapping[header] = fieldName;
+      }
     }
   }
 
