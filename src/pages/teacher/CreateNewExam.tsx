@@ -12,7 +12,9 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowRight, Save } from "lucide-react";
+import { ArrowRight, Save, Pencil } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 
 interface UnifiedQuestion {
   id: string;
@@ -58,6 +60,68 @@ const CreateNewExam = () => {
   const [questionsLoading, setQuestionsLoading] = useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Edit question states
+  const [editingQuestion, setEditingQuestion] = useState<UnifiedQuestion | null>(null);
+  const [editForm, setEditForm] = useState({ question_text: "", option_a: "", option_b: "", option_c: "", option_d: "", correct_answer: "" });
+  const [saving, setSaving] = useState(false);
+
+  const openEditDialog = (q: UnifiedQuestion) => {
+    setEditingQuestion(q);
+    setEditForm({
+      question_text: q.question_text || "",
+      option_a: q.option_a || "",
+      option_b: q.option_b || "",
+      option_c: q.option_c || "",
+      option_d: q.option_d || "",
+      correct_answer: q.correct_answer || "",
+    });
+  };
+
+  const handleEditSave = async () => {
+    if (!editingQuestion) return;
+    setSaving(true);
+    try {
+      if (editingQuestion.source === "text") {
+        const { error } = await supabase
+          .from("text_question_bank")
+          .update({
+            question_text: editForm.question_text,
+            option_a: editForm.option_a,
+            option_b: editForm.option_b,
+            option_c: editForm.option_c,
+            option_d: editForm.option_d,
+            correct_answer: editForm.correct_answer,
+          })
+          .eq("id", editingQuestion.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("question_bank")
+          .update({ correct_answer: editForm.correct_answer })
+          .eq("id", editingQuestion.id);
+        if (error) throw error;
+      }
+      setQuestions((prev) =>
+        prev.map((q) =>
+          q.id === editingQuestion.id
+            ? {
+                ...q,
+                ...(editingQuestion.source === "text"
+                  ? { question_text: editForm.question_text, option_a: editForm.option_a, option_b: editForm.option_b, option_c: editForm.option_c, option_d: editForm.option_d, correct_answer: editForm.correct_answer }
+                  : { correct_answer: editForm.correct_answer }),
+              }
+            : q
+        )
+      );
+      toast({ title: "تم حفظ التعديلات بنجاح" });
+      setEditingQuestion(null);
+    } catch (err: any) {
+      toast({ title: "خطأ في حفظ التعديلات", description: err.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const subject = authUser?.profile?.subject || "رياضيات";
 
@@ -265,6 +329,7 @@ const CreateNewExam = () => {
                         <TableHead className="text-right">النوع</TableHead>
                         <TableHead className="text-right">الإجابة</TableHead>
                         <TableHead className="text-right">معاينة</TableHead>
+                        <TableHead className="text-right w-[50px]">تعديل</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -299,6 +364,11 @@ const CreateNewExam = () => {
                               </p>
                             )}
                           </TableCell>
+                          <TableCell>
+                            <Button variant="ghost" size="icon" onClick={() => openEditDialog(q)}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -320,6 +390,59 @@ const CreateNewExam = () => {
           </>
         )}
       </div>
+
+      {/* Edit Question Dialog */}
+      <Dialog open={!!editingQuestion} onOpenChange={(open) => !open && setEditingQuestion(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>تعديل السؤال رقم {editingQuestion?.question_number}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {editingQuestion?.source === "text" && (
+              <div className="space-y-2">
+                <Label>نص السؤال</Label>
+                <Textarea
+                  value={editForm.question_text}
+                  onChange={(e) => setEditForm((f) => ({ ...f, question_text: e.target.value }))}
+                  rows={3}
+                />
+              </div>
+            )}
+            {editingQuestion?.source === "text" && editingQuestion?.question_type === "اختيار متعدد" && (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label>الخيار أ</Label>
+                    <Input value={editForm.option_a} onChange={(e) => setEditForm((f) => ({ ...f, option_a: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>الخيار ب</Label>
+                    <Input value={editForm.option_b} onChange={(e) => setEditForm((f) => ({ ...f, option_b: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>الخيار ج</Label>
+                    <Input value={editForm.option_c} onChange={(e) => setEditForm((f) => ({ ...f, option_c: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>الخيار د</Label>
+                    <Input value={editForm.option_d} onChange={(e) => setEditForm((f) => ({ ...f, option_d: e.target.value }))} />
+                  </div>
+                </div>
+              </>
+            )}
+            <div className="space-y-2">
+              <Label>الإجابة الصحيحة</Label>
+              <Input value={editForm.correct_answer} onChange={(e) => setEditForm((f) => ({ ...f, correct_answer: e.target.value }))} />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setEditingQuestion(null)}>إلغاء</Button>
+            <Button onClick={handleEditSave} disabled={saving}>
+              {saving ? "جاري الحفظ..." : "حفظ التعديلات"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 };
