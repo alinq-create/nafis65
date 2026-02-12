@@ -43,6 +43,8 @@ const QuestionBank = () => {
   const [loading, setLoading] = useState(true);
   const [editingQuestion, setEditingQuestion] = useState<UnifiedQuestion | null>(null);
   const [deletingQuestion, setDeletingQuestion] = useState<UnifiedQuestion | null>(null);
+  const [showBulkDelete, setShowBulkDelete] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const { toast } = useToast();
 
   const fetchQuestions = async () => {
@@ -73,6 +75,31 @@ const QuestionBank = () => {
       toast({ title: "تم حذف السؤال بنجاح" });
     }
     setDeletingQuestion(null);
+  };
+
+  const handleBulkDelete = async () => {
+    setBulkDeleting(true);
+    const imageIds = questions.filter(q => q.source === 'image').map(q => q.id);
+    const textIds = questions.filter(q => q.source === 'text').map(q => q.id);
+    let hasError = false;
+
+    if (imageIds.length > 0) {
+      const { error } = await supabase.from('question_bank').delete().in('id', imageIds);
+      if (error) hasError = true;
+    }
+    if (textIds.length > 0) {
+      const { error } = await supabase.from('text_question_bank').delete().in('id', textIds);
+      if (error) hasError = true;
+    }
+
+    if (hasError) {
+      toast({ title: "حدث خطأ أثناء حذف بعض الأسئلة", variant: "destructive" });
+    } else {
+      toast({ title: `تم حذف ${questions.length} سؤال بنجاح` });
+      setQuestions([]);
+    }
+    setBulkDeleting(false);
+    setShowBulkDelete(false);
   };
 
   const getImageUrl = (question: UnifiedQuestion) => {
@@ -115,11 +142,23 @@ const QuestionBank = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div>
-          <h2 className="text-2xl font-bold">بنك الأسئلة</h2>
-          <p className="text-muted-foreground mt-1">
-            {questions.length} سؤال في البنك
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold">بنك الأسئلة</h2>
+            <p className="text-muted-foreground mt-1">
+              {questions.length} سؤال في البنك
+            </p>
+          </div>
+          {questions.length > 0 && (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setShowBulkDelete(true)}
+            >
+              <Trash2 className="h-4 w-4 ml-2" />
+              حذف جميع الأسئلة
+            </Button>
+          )}
         </div>
 
         <Card>
@@ -239,6 +278,28 @@ const QuestionBank = () => {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               تأكيد الحذف
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Delete Confirmation */}
+      <AlertDialog open={showBulkDelete} onOpenChange={setShowBulkDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>حذف جميع الأسئلة</AlertDialogTitle>
+            <AlertDialogDescription>
+              هل أنتِ متأكدة من حذف جميع الأسئلة ({questions.length} سؤال)؟ لا يمكن التراجع عن هذا الإجراء.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkDeleting}>إلغاء</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBulkDelete}
+              disabled={bulkDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {bulkDeleting ? "جارٍ الحذف..." : "تأكيد حذف الكل"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
