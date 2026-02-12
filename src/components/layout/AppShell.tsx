@@ -13,17 +13,18 @@ const AppShell = ({ children, hideHeader = false, hideFooter = false, headerExtr
       {/* Header */}
       {!hideHeader &&
       <header className="bg-gradient-to-l from-[hsl(145,55%,42%)] via-[hsl(199,70%,45%)] to-[hsl(35,85%,55%)] px-4 py-3 shadow-md">
-          <div className="max-w-7xl mx-auto flex items-center gap-4">
-            <img
-            src={schoolLogo}
-            alt="شعار المدرسة المتوسطة 65"
-            className="h-14 w-14 rounded-full bg-white p-1 object-contain" />
-
-            <div className="text-white">
-              <h1 className="text-lg font-bold leading-tight text-primary-foreground">منصة تدريب نافس</h1>
-              <p className="text-sm opacity-90">المتوسطة الخامسة والستون</p>
+          <div className="flex items-center w-full">
+            <div className="max-w-7xl mx-auto flex-1 flex items-center gap-4">
+              <img
+                src={schoolLogo}
+                alt="شعار المدرسة المتوسطة 65"
+                className="h-14 w-14 rounded-full bg-white p-1 object-contain" />
+              <div className="text-white">
+                <h1 className="text-lg font-bold leading-tight text-primary-foreground">منصة تدريب نافس</h1>
+                <p className="text-sm opacity-90">المتوسطة الخامسة والستون</p>
+              </div>
             </div>
-            {headerExtra && <div className="ml-auto">{headerExtra}</div>}
+            {headerExtra && <div>{headerExtra}</div>}
           </div>
         </header>
       }
