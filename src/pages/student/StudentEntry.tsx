@@ -7,8 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, LogIn } from "lucide-react";
 import AppShell from "@/components/layout/AppShell";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import nafisLogo from "@/assets/nafis-logo.png";
 
 interface AvailableExam {
@@ -151,7 +152,22 @@ const StudentEntry = () => {
 
   return (
     <AppShell>
-      <div className="flex flex-1 items-center justify-center p-4">
+      <div className="relative flex flex-1 items-center justify-center p-4">
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => navigate("/login")}
+                className="absolute top-4 left-4 z-10 p-2.5 rounded-full border border-border/50 bg-background/80 backdrop-blur-sm text-muted-foreground hover:text-primary hover:border-primary/50 hover:bg-primary/5 transition-all duration-300 shadow-sm hover:shadow-md"
+              >
+                <LogIn className="h-5 w-5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <p>دخول المعلمات والمديرات</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
             <img src={nafisLogo} alt="شعار نافس" className="h-28 mx-auto mb-4 object-contain" />
@@ -214,14 +230,6 @@ const StudentEntry = () => {
             </CardContent>
           </Card>
 
-          <div className="text-center mt-6">
-            <button
-              onClick={() => navigate("/login")}
-              className="text-muted-foreground hover:text-foreground text-sm"
-            >
-              هل أنتِ معلمة أو مديرة؟ تسجيل الدخول
-            </button>
-          </div>
         </div>
       </div>
     </AppShell>

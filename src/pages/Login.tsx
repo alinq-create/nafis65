@@ -110,14 +110,6 @@ const Login = () => {
             </CardContent>
           </Card>
 
-          <div className="text-center mt-6">
-            <button
-              onClick={() => navigate("/student")}
-              className="text-primary hover:underline font-medium"
-            >
-              هل أنتِ طالبة؟ اضغطي هنا للدخول للاختبار
-            </button>
-          </div>
         </div>
       </div>
     </AppShell>
