@@ -1,57 +1,51 @@
 
 
-# اصلاح مطابقة رقم السؤال في صفحة استيراد الاسئلة النصية
+# Fix question_number mapping collision
 
-## المشكلة
-في السطر 211، يتم تحويل رقم السؤال بـ `Number(mapped.question_number) || 0` مما يعطي 0 دائما اذا لم يتم العثور على العمود. والسبب ان COLUMN_MAP لا يحتوي على جميع الاسماء المحتملة لعمود رقم السؤال في ملفات Excel العربية.
+## Root Cause
 
-## التغييرات (ملف واحد فقط)
+The Excel file contains three columns that ALL map to `question_number` in the COLUMN_MAP:
 
-### `src/pages/system/ImportTextQuestions.tsx`
+| Excel Column | Example Value | Numeric? |
+|---|---|---|
+| question_number | 1, 2, 3... | Yes |
+| question_id | Q1, Q2, Q3... | No |
+| question_number_in_book | n1-m1-1 | No |
 
-**1. اضافة اسماء اعمدة جديدة في COLUMN_MAP (حوالي سطر 56-76):**
+When the mapping loop runs, the last column processed overwrites the earlier ones. So `question_number_in_book` (value: "n1-m1-1") overwrites the real `question_number` (value: 1), and parseInt("n1-m1-1") returns NaN, resulting in null/"خطأ".
 
-اضافة هذه المفاتيح الجديدة:
-- `"question number"` - موجود بالفعل
-- `"question id"` - جديد
-- `"رقم"` - جديد
-- `"question number in book"` - جديد
+## Fix (single file: `src/pages/system/ImportTextQuestions.tsx`)
 
-ملاحظة: `"رقم السوال"` موجود بالفعل في السطر 56 (بعد ازالة التشكيل تصبح "رقم السوال" وهي تطابق "رقم السؤال").
+### 1. Remove conflicting mappings from COLUMN_MAP (lines 77-79)
 
-**2. تعديل منطق التحويل في سطر 211:**
+Remove these three lines that were added in the last edit:
+- `"question id": "question_number"` -- these are IDs like Q1, not numbers
+- `"رقم": "question_number"` -- too generic, could collide
+- `"question number in book": "question_number"` -- contains non-numeric codes
 
-تغيير من:
+Keep only `"question number": "question_number"` (line 76) and `"رقم السوال": "question_number"` (line 56).
+
+### 2. Update parsing to prefer first valid numeric value (lines 214-219)
+
+Instead of relying on a single mapped field, scan ALL columns that could contain a question number and use the first valid integer found:
+
 ```
-question_number: Number(mapped.question_number) || 0,
-```
-
-الى:
-```typescript
 question_number: (() => {
+  // Try the mapped value first
   const raw = mapped.question_number;
-  if (raw === undefined || raw === null || String(raw).trim() === '') return null;
-  const parsed = parseInt(String(raw), 10);
-  return isNaN(parsed) ? null : parsed;
+  if (raw !== undefined && raw !== null) {
+    const parsed = parseInt(String(raw), 10);
+    if (!isNaN(parsed)) return parsed;
+  }
+  return null;
 })(),
 ```
 
-**3. تحديث نوع ParsedTextQuestion (سطر 20):**
+This is already correct -- the real fix is just removing the conflicting mappings so the correct column value isn't overwritten.
 
-تغيير `question_number: number` الى `question_number: number | null` للسماح بقيمة null عند فشل التحويل.
+## Summary
 
-**4. تحديث عرض المعاينة (سطر 397):**
+- Remove 3 lines from COLUMN_MAP (lines 77-79)
+- The existing parsing logic at lines 214-219 is already correct and needs no change
+- Result: question_number column (with values 1, 2, 3...) will be correctly mapped without being overwritten
 
-تغيير من:
-```
-<TableCell>{q.question_number}</TableCell>
-```
-الى:
-```
-<TableCell>{q.question_number !== null ? q.question_number : <span className="text-red-500">خطأ</span>}</TableCell>
-```
-
-## النتيجة
-- المعاينة تعرض ارقام الاسئلة الحقيقية (1, 2, 3, ...) بدل 0
-- اذا فشل التحويل يظهر "خطأ" بالاحمر بدل 0
-- لا تغيير على قاعدة البيانات او منطق التكرار
