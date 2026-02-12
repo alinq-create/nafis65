@@ -7,7 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { GraduationCap, ArrowRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
+import AppShell from "@/components/layout/AppShell";
+import nafisLogo from "@/assets/nafis-logo.png";
 
 interface AvailableExam {
   id: string;
@@ -50,7 +52,6 @@ const StudentEntry = () => {
         return;
       }
 
-      // Single exam: navigate directly
       if (data.examId) {
         navigate("/student/exam", {
           state: {
@@ -64,7 +65,6 @@ const StudentEntry = () => {
         return;
       }
 
-      // Multiple exams: show selection
       if (data.exams?.length) {
         setAvailableExams(data.exams);
       }
@@ -112,120 +112,119 @@ const StudentEntry = () => {
     }
   };
 
-  // Show exam selection view
   if (availableExams) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background p-4">
-        <div className="w-full max-w-md">
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary text-primary-foreground mb-4">
-              <GraduationCap className="h-8 w-8" />
+      <AppShell>
+        <div className="flex flex-1 items-center justify-center p-4">
+          <div className="w-full max-w-md">
+            <div className="text-center mb-8">
+              <img src={nafisLogo} alt="شعار نافس" className="h-24 mx-auto mb-4 object-contain" />
+              <h1 className="text-3xl font-bold text-foreground">اختر الاختبار</h1>
+              <p className="text-muted-foreground mt-2">يوجد أكثر من اختبار متاح، اختاري واحدًا</p>
             </div>
-            <h1 className="text-3xl font-bold text-foreground">اختر الاختبار</h1>
-            <p className="text-muted-foreground mt-2">يوجد أكثر من اختبار متاح، اختاري واحدًا</p>
-          </div>
 
-          <div className="space-y-3">
-            {availableExams.map((exam) => (
-              <Card
-                key={exam.id}
-                className="cursor-pointer hover:border-primary transition-colors shadow-sm"
-                onClick={() => handleExamSelect(exam.id)}
-              >
-                <CardContent className="flex items-center justify-between p-5">
-                  <span className="font-medium text-lg">{exam.exam_name}</span>
-                  <ArrowRight className="h-5 w-5 text-muted-foreground" />
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+            <div className="space-y-3">
+              {availableExams.map((exam) => (
+                <Card
+                  key={exam.id}
+                  className="cursor-pointer hover:border-primary transition-colors shadow-sm"
+                  onClick={() => handleExamSelect(exam.id)}
+                >
+                  <CardContent className="flex items-center justify-between p-5">
+                    <span className="font-medium text-lg">{exam.exam_name}</span>
+                    <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
 
-          <div className="text-center mt-6">
-            <Button variant="outline" onClick={() => setAvailableExams(null)} disabled={isLoading}>
-              {isLoading ? "جاري التحميل..." : "رجوع"}
-            </Button>
+            <div className="text-center mt-6">
+              <Button variant="outline" onClick={() => setAvailableExams(null)} disabled={isLoading}>
+                {isLoading ? "جاري التحميل..." : "رجوع"}
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
+      </AppShell>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary text-primary-foreground mb-4">
-            <GraduationCap className="h-8 w-8" />
+    <AppShell>
+      <div className="flex flex-1 items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          <div className="text-center mb-8">
+            <img src={nafisLogo} alt="شعار نافس" className="h-28 mx-auto mb-4 object-contain" />
+            <h1 className="text-3xl font-bold text-foreground">منصة تدريب نافس</h1>
+            <p className="text-muted-foreground mt-2">أدخلي بياناتك للبدء بالاختبار</p>
           </div>
-          <h1 className="text-3xl font-bold text-foreground">منصة نافس</h1>
-          <p className="text-muted-foreground mt-2">أدخلي بياناتك للبدء بالاختبار</p>
-        </div>
 
-        <Card className="shadow-lg border-0">
-          <CardHeader className="text-center pb-4">
-            <CardTitle className="text-xl">دخول الاختبار</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <div className="space-y-2">
-                <Label>اسم الطالبة</Label>
-                <Input
-                  value={studentName}
-                  onChange={(e) => setStudentName(e.target.value)}
-                  placeholder="أدخلي اسمك الكامل"
-                  required
-                />
-              </div>
+          <Card className="shadow-lg border-0">
+            <CardHeader className="text-center pb-4">
+              <CardTitle className="text-xl">دخول الاختبار</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-5">
+                <div className="space-y-2">
+                  <Label>اسم الطالبة</Label>
+                  <Input
+                    value={studentName}
+                    onChange={(e) => setStudentName(e.target.value)}
+                    placeholder="أدخلي اسمك الكامل"
+                    required
+                  />
+                </div>
 
-              <div className="space-y-2">
-                <Label>رقم الفصل</Label>
-                <Select value={classNumber} onValueChange={setClassNumber}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="اختاري رقم الفصل" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.from({ length: 10 }, (_, i) => (
-                      <SelectItem key={i + 1} value={String(i + 1)}>
-                        فصل {i + 1}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                <div className="space-y-2">
+                  <Label>رقم الفصل</Label>
+                  <Select value={classNumber} onValueChange={setClassNumber}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="اختاري رقم الفصل" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 10 }, (_, i) => (
+                        <SelectItem key={i + 1} value={String(i + 1)}>
+                          فصل {i + 1}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-              <div className="space-y-2">
-                <Label>المادة</Label>
-                <Select value={subject} onValueChange={setSubject}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="اختاري المادة" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SUBJECTS.map((s) => (
-                      <SelectItem key={s} value={s}>
-                        {s}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                <div className="space-y-2">
+                  <Label>المادة</Label>
+                  <Select value={subject} onValueChange={setSubject}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="اختاري المادة" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SUBJECTS.map((s) => (
+                        <SelectItem key={s} value={s}>
+                          {s}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-              <Button type="submit" className="w-full" disabled={isLoading || !studentName.trim() || !classNumber || !subject}>
-                {isLoading ? "جاري البحث..." : "دخول الاختبار"}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+                <Button type="submit" className="w-full" disabled={isLoading || !studentName.trim() || !classNumber || !subject}>
+                  {isLoading ? "جاري البحث..." : "دخول الاختبار"}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
 
-        <div className="text-center mt-6">
-          <button
-            onClick={() => navigate("/login")}
-            className="text-muted-foreground hover:text-foreground text-sm"
-          >
-            هل أنتِ معلمة أو مديرة؟ تسجيل الدخول
-          </button>
+          <div className="text-center mt-6">
+            <button
+              onClick={() => navigate("/login")}
+              className="text-muted-foreground hover:text-foreground text-sm"
+            >
+              هل أنتِ معلمة أو مديرة؟ تسجيل الدخول
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    </AppShell>
   );
 };
 
