@@ -1,13 +1,16 @@
+import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { useNavigate, useLocation } from "react-router-dom";
-import { LogOut, LayoutDashboard, Users, BookOpen, FileText, ClipboardCheck, BarChart3, Upload } from "lucide-react";
+import { LogOut, LayoutDashboard, Users, BookOpen, FileText, ClipboardCheck, BarChart3, Upload, Menu } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import schoolLogo from "@/assets/school-logo-65.png";
 
 const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   const { authUser, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const handleSignOut = async () => {
     await signOut();
@@ -39,11 +42,65 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
 
   const links = role === "system_admin" ? systemAdminLinks : role === "admin" ? adminLinks : teacherLinks;
 
+  const handleNavigate = (path: string) => {
+    navigate(path);
+    setSidebarOpen(false);
+  };
+
+  const NavLinks = ({ onNavigate }: { onNavigate: (path: string) => void }) => (
+    <>
+      {links.map((link) => {
+        const Icon = link.icon;
+        const isActive = location.pathname === link.path;
+        return (
+          <button
+            key={link.path}
+            onClick={() => onNavigate(link.path)}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+              isActive
+                ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                : "hover:bg-sidebar-accent/50 text-sidebar-foreground/80"
+            }`}
+          >
+            <Icon className="h-5 w-5" />
+            {link.label}
+          </button>
+        );
+      })}
+    </>
+  );
+
+  const UserInfo = ({ onSignOut }: { onSignOut: () => void }) => (
+    <div className="p-4 border-t border-sidebar-border">
+      <div className="mb-3 px-2">
+        <p className="text-sm font-medium">{authUser?.profile?.name}</p>
+        <p className="text-xs opacity-70">{authUser?.profile?.subject || "مديرة"}</p>
+      </div>
+      <Button
+        variant="ghost"
+        className="w-full justify-start text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
+        onClick={onSignOut}
+      >
+        <LogOut className="h-4 w-4 ml-2" />
+        تسجيل الخروج
+      </Button>
+    </div>
+  );
+
   return (
     <div className="flex flex-col min-h-screen">
       {/* Top Header */}
       <header className="bg-gradient-to-l from-[hsl(145,55%,42%)] via-[hsl(199,70%,45%)] to-[hsl(35,85%,55%)] px-4 py-3 shadow-md">
         <div className="flex items-center gap-4">
+          {/* Hamburger button - mobile only */}
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="md:hidden text-white p-1 rounded-md hover:bg-white/20 transition-colors"
+            aria-label="فتح القائمة"
+          >
+            <Menu className="h-6 w-6" />
+          </button>
+
           <img
             src={schoolLogo}
             alt="شعار المدرسة المتوسطة 65"
@@ -57,54 +114,37 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
       </header>
 
       <div className="flex flex-1 pb-12">
-        {/* Sidebar */}
-        <aside className="w-64 bg-sidebar text-sidebar-foreground flex flex-col shrink-0">
+        {/* Mobile Sidebar Sheet */}
+        <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+          <SheetContent side="right" className="w-72 bg-sidebar text-sidebar-foreground p-0">
+            <SheetHeader className="p-6 border-b border-sidebar-border">
+              <SheetTitle className="text-sidebar-foreground text-right">
+                {role === "system_admin" ? "لوحة مدير النظام" : role === "admin" ? "لوحة المديرة" : "لوحة المعلمة"}
+              </SheetTitle>
+            </SheetHeader>
+            <nav className="flex-1 p-4 space-y-1">
+              <NavLinks onNavigate={handleNavigate} />
+            </nav>
+            <UserInfo onSignOut={handleSignOut} />
+          </SheetContent>
+        </Sheet>
+
+        {/* Desktop Sidebar */}
+        <aside className="hidden md:flex w-64 bg-sidebar text-sidebar-foreground flex-col shrink-0">
           <div className="p-6 border-b border-sidebar-border">
             <p className="text-sm opacity-80">
               {role === "system_admin" ? "لوحة مدير النظام" : role === "admin" ? "لوحة المديرة" : "لوحة المعلمة"}
             </p>
           </div>
-          
           <nav className="flex-1 p-4 space-y-1">
-            {links.map((link) => {
-              const Icon = link.icon;
-              const isActive = location.pathname === link.path;
-              return (
-                <button
-                  key={link.path}
-                  onClick={() => navigate(link.path)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-                    isActive
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                      : "hover:bg-sidebar-accent/50 text-sidebar-foreground/80"
-                  }`}
-                >
-                  <Icon className="h-5 w-5" />
-                  {link.label}
-                </button>
-              );
-            })}
+            <NavLinks onNavigate={(path) => navigate(path)} />
           </nav>
-
-          <div className="p-4 border-t border-sidebar-border">
-            <div className="mb-3 px-2">
-              <p className="text-sm font-medium">{authUser?.profile?.name}</p>
-              <p className="text-xs opacity-70">{authUser?.profile?.subject || "مديرة"}</p>
-            </div>
-            <Button
-              variant="ghost"
-              className="w-full justify-start text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
-              onClick={handleSignOut}
-            >
-              <LogOut className="h-4 w-4 ml-2" />
-              تسجيل الخروج
-            </Button>
-          </div>
+          <UserInfo onSignOut={handleSignOut} />
         </aside>
 
         {/* Main Content */}
         <main className="flex-1 overflow-auto">
-          <div className="p-8">{children}</div>
+          <div className="p-4 md:p-8">{children}</div>
         </main>
       </div>
 
