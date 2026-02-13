@@ -8,9 +8,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil } from "lucide-react";
+import { Plus, Pencil, Trash2 } from "lucide-react";
 
 interface TeacherData {
   user_id: string;
@@ -37,6 +38,7 @@ const ManageTeachers = () => {
     toClass: "10",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deletingTeacherId, setDeletingTeacherId] = useState<string | null>(null);
   const { toast } = useToast();
 
   const fetchTeachers = async () => {
@@ -162,6 +164,29 @@ const ManageTeachers = () => {
       toast({ title: "حدث خطأ", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteTeacher = async (teacher: TeacherData) => {
+    setDeletingTeacherId(teacher.user_id);
+    try {
+      const { data, error } = await supabase.functions.invoke("manage-teacher", {
+        body: {
+          action: "delete",
+          userId: teacher.user_id,
+        },
+      });
+
+      if (error || data?.error) {
+        throw new Error(data?.error || "حدث خطأ في الحذف");
+      }
+
+      toast({ title: "تم حذف المعلمة وجميع بياناتها بنجاح" });
+      fetchTeachers();
+    } catch (err: any) {
+      toast({ title: "خطأ في الحذف", description: err.message, variant: "destructive" });
+    } finally {
+      setDeletingTeacherId(null);
     }
   };
 
@@ -374,6 +399,30 @@ const ManageTeachers = () => {
                           >
                             {teacher.status === "active" ? "تعطيل" : "تفعيل"}
                           </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="sm" disabled={deletingTeacherId === teacher.user_id}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent dir="rtl">
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>حذف المعلمة</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  هل تريدين حذف المعلمة "{teacher.name}"؟ سيتم حذف جميع اختباراتها ومحاولات الطالبات ونتائجهن المرتبطة بها نهائياً، ولن تظهر في التحليلات.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter className="flex-row-reverse gap-2">
+                                <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleDeleteTeacher(teacher)}
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                  حذف نهائي
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </div>
                       </TableCell>
                     </TableRow>

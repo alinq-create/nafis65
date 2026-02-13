@@ -4,7 +4,11 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Trash2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface ApprovedAttempt {
   id: string;
@@ -24,49 +28,51 @@ const AdminAttempts = () => {
   const [subjects, setSubjects] = useState<string[]>([]);
   const [classes, setClasses] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  const fetchApprovedAttempts = async () => {
+    setLoading(true);
+
+    const { data: exams } = await supabase
+      .from("exams")
+      .select("id, exam_name, subject");
+
+    if (!exams?.length) {
+      setLoading(false);
+      return;
+    }
+
+    const examMap = new Map(exams.map((e) => [e.id, e]));
+    const examIds = exams.map((e) => e.id);
+
+    const { data: attemptsData } = await supabase
+      .from("student_attempts")
+      .select("*")
+      .in("exam_id", examIds)
+      .eq("status", "معتمد")
+      .order("submission_time", { ascending: false });
+
+    const mapped: ApprovedAttempt[] = (attemptsData ?? []).map((a) => ({
+      id: a.id,
+      student_name: a.student_name,
+      class_number: a.class_number,
+      submission_time: a.submission_time,
+      approved_score: a.approved_score,
+      exam_name: examMap.get(a.exam_id)?.exam_name ?? "",
+      subject: examMap.get(a.exam_id)?.subject ?? "",
+    }));
+
+    setAttempts(mapped);
+
+    const uniqueSubjects = [...new Set(mapped.map((a) => a.subject))];
+    const uniqueClasses = [...new Set(mapped.map((a) => a.class_number))].sort((a, b) => a - b);
+    setSubjects(uniqueSubjects);
+    setClasses(uniqueClasses);
+    setLoading(false);
+  };
 
   useEffect(() => {
-    const fetchApprovedAttempts = async () => {
-      setLoading(true);
-
-      const { data: exams } = await supabase
-        .from("exams")
-        .select("id, exam_name, subject");
-
-      if (!exams?.length) {
-        setLoading(false);
-        return;
-      }
-
-      const examMap = new Map(exams.map((e) => [e.id, e]));
-      const examIds = exams.map((e) => e.id);
-
-      const { data: attemptsData } = await supabase
-        .from("student_attempts")
-        .select("*")
-        .in("exam_id", examIds)
-        .eq("status", "معتمد")
-        .order("submission_time", { ascending: false });
-
-      const mapped: ApprovedAttempt[] = (attemptsData ?? []).map((a) => ({
-        id: a.id,
-        student_name: a.student_name,
-        class_number: a.class_number,
-        submission_time: a.submission_time,
-        approved_score: a.approved_score,
-        exam_name: examMap.get(a.exam_id)?.exam_name ?? "",
-        subject: examMap.get(a.exam_id)?.subject ?? "",
-      }));
-
-      setAttempts(mapped);
-
-      const uniqueSubjects = [...new Set(mapped.map((a) => a.subject))];
-      const uniqueClasses = [...new Set(mapped.map((a) => a.class_number))].sort((a, b) => a - b);
-      setSubjects(uniqueSubjects);
-      setClasses(uniqueClasses);
-      setLoading(false);
-    };
-
     fetchApprovedAttempts();
   }, []);
 
@@ -80,6 +86,22 @@ const AdminAttempts = () => {
     }
     setFilteredAttempts(filtered);
   }, [attempts, subjectFilter, classFilter]);
+
+  const handleDeleteAttempt = async (attemptId: string) => {
+    setDeletingId(attemptId);
+    try {
+      // Delete answers first, then the attempt
+      await supabase.from("student_answers").delete().eq("attempt_id", attemptId);
+      await supabase.from("student_attempts").delete().eq("id", attemptId);
+
+      toast({ title: "تم حذف المحاولة بنجاح" });
+      setAttempts((prev) => prev.filter((a) => a.id !== attemptId));
+    } catch (err: any) {
+      toast({ title: "خطأ في الحذف", description: err.message, variant: "destructive" });
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   return (
     <DashboardLayout>
@@ -136,6 +158,7 @@ const AdminAttempts = () => {
                     <TableHead className="text-right">المادة</TableHead>
                     <TableHead className="text-right">الدرجة المعتمدة</TableHead>
                     <TableHead className="text-right">وقت الإرسال</TableHead>
+                    <TableHead className="text-right">إجراءات</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -150,6 +173,32 @@ const AdminAttempts = () => {
                       <TableCell className="font-bold">{attempt.approved_score ?? "—"}</TableCell>
                       <TableCell className="text-muted-foreground">
                         {new Date(attempt.submission_time).toLocaleDateString("ar-SA")}
+                      </TableCell>
+                      <TableCell>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="sm" disabled={deletingId === attempt.id}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent dir="rtl">
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>حذف المحاولة</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                هل تريدين حذف محاولة "{attempt.student_name}" في اختبار "{attempt.exam_name}"؟ سيتم حذف الإجابات والنتيجة نهائياً ولن تظهر في التحليلات.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter className="flex-row-reverse gap-2">
+                              <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleDeleteAttempt(attempt.id)}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                حذف
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </TableCell>
                     </TableRow>
                   ))}

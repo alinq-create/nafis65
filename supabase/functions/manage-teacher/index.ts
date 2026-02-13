@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -45,7 +45,7 @@ serve(async (req) => {
       });
     }
 
-    const { action, name, username, password, subject, fromClass, toClass } = await req.json();
+    const { action, name, username, password, subject, fromClass, toClass, userId } = await req.json();
 
     if (action === "create") {
       // Validate username is Latin characters only
@@ -96,6 +96,66 @@ serve(async (req) => {
       });
 
       return new Response(JSON.stringify({ success: true, userId: newUserId }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (action === "delete") {
+      if (!userId) {
+        return new Response(JSON.stringify({ error: "معرف المعلمة مطلوب" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // 1. Get teacher's exams
+      const { data: exams } = await adminClient
+        .from("exams")
+        .select("id")
+        .eq("teacher_id", userId);
+
+      const examIds = exams?.map((e: any) => e.id) ?? [];
+
+      if (examIds.length > 0) {
+        // 2. Get attempts for those exams
+        const { data: attempts } = await adminClient
+          .from("student_attempts")
+          .select("id")
+          .in("exam_id", examIds);
+
+        const attemptIds = attempts?.map((a: any) => a.id) ?? [];
+
+        // 3. Delete student_answers
+        if (attemptIds.length > 0) {
+          await adminClient.from("student_answers").delete().in("attempt_id", attemptIds);
+        }
+
+        // 4. Delete student_attempts
+        await adminClient.from("student_attempts").delete().in("exam_id", examIds);
+
+        // 5. Delete exam_questions
+        await adminClient.from("exam_questions").delete().in("exam_id", examIds);
+
+        // 6. Delete exams
+        await adminClient.from("exams").delete().eq("teacher_id", userId);
+      }
+
+      // 7. Delete question_bank
+      await adminClient.from("question_bank").delete().eq("teacher_id", userId);
+
+      // 8. Delete class_permissions
+      await adminClient.from("class_permissions").delete().eq("teacher_id", userId);
+
+      // 9. Delete user_roles
+      await adminClient.from("user_roles").delete().eq("user_id", userId);
+
+      // 10. Delete profile
+      await adminClient.from("profiles").delete().eq("user_id", userId);
+
+      // 11. Delete auth user
+      await adminClient.auth.admin.deleteUser(userId);
+
+      return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
