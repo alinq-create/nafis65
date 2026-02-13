@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Plus } from "lucide-react";
+import { Plus, BarChart3 } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Exam = Tables<"exams">;
@@ -101,6 +101,9 @@ const CreateExam = () => {
                       <TableCell>{getStatusBadge(exam.status)}</TableCell>
                       <TableCell>
                         <div className="flex gap-2">
+                          <Button size="sm" variant="ghost" onClick={() => navigate(`/teacher/exam-analytics/${exam.id}`)}>
+                            <BarChart3 className="h-4 w-4" />
+                          </Button>
                           {exam.status === "مسودة" && (
                             <Button size="sm" onClick={() => handlePublishExam(exam.id)}>
                               نشر
