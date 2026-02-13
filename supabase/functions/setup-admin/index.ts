@@ -16,10 +16,39 @@ serve(async (req) => {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const adminClient = createClient(supabaseUrl, serviceKey);
 
-    const { username, password, name } = await req.json();
+    const { username, password, name, secret } = await req.json();
+
+    // Verify setup secret
+    const setupSecret = Deno.env.get("SETUP_SECRET");
+    if (!setupSecret || secret !== setupSecret) {
+      return new Response(JSON.stringify({ error: "غير مصرح" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     if (!username || !password || !name) {
       return new Response(JSON.stringify({ error: "جميع الحقول مطلوبة" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Validate inputs
+    if (typeof username !== "string" || username.length > 50 || !/^[a-zA-Z0-9._-]+$/.test(username)) {
+      return new Response(JSON.stringify({ error: "اسم المستخدم غير صالح" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (typeof password !== "string" || password.length < 6 || password.length > 100) {
+      return new Response(JSON.stringify({ error: "كلمة المرور يجب أن تكون بين 6 و 100 حرف" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (typeof name !== "string" || name.length > 100) {
+      return new Response(JSON.stringify({ error: "الاسم غير صالح" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -75,7 +104,7 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), {
+    return new Response(JSON.stringify({ error: "حدث خطأ في الخادم" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

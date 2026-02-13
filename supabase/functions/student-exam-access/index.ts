@@ -6,6 +6,22 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+function validateStudentName(name: unknown): name is string {
+  return typeof name === "string" && name.trim().length >= 1 && name.length <= 100;
+}
+
+function validateClassNumber(num: unknown): num is number {
+  return typeof num === "number" && Number.isInteger(num) && num >= 1 && num <= 20;
+}
+
+function validateSubject(subject: unknown): subject is string {
+  return typeof subject === "string" && subject.trim().length >= 1 && subject.length <= 50;
+}
+
+function validateUUID(id: unknown): id is string {
+  return typeof id === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+}
+
 async function fetchAndMergeQuestions(adminClient: any, examId: string) {
   const { data: examQuestions } = await adminClient
     .from("exam_questions")
@@ -46,14 +62,32 @@ serve(async (req) => {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const adminClient = createClient(supabaseUrl, serviceKey);
 
-    const { studentName, classNumber, subject, examId } = await req.json();
+    const body = await req.json();
+    const { studentName, classNumber, subject, examId } = body;
 
-    if (!studentName || !classNumber || !subject) {
-      return new Response(JSON.stringify({ error: "جميع الحقول مطلوبة" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+    // Input validation
+    if (!validateStudentName(studentName)) {
+      return new Response(JSON.stringify({ error: "اسم الطالبة غير صالح" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    if (!validateClassNumber(classNumber)) {
+      return new Response(JSON.stringify({ error: "رقم الفصل غير صالح" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (!validateSubject(subject)) {
+      return new Response(JSON.stringify({ error: "المادة غير صالحة" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (examId !== undefined && !validateUUID(examId)) {
+      return new Response(JSON.stringify({ error: "معرف الاختبار غير صالح" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const sanitizedName = studentName.trim().slice(0, 100);
 
     // Pattern 2: Fetch specific exam questions
     if (examId) {
@@ -65,30 +99,26 @@ serve(async (req) => {
 
       if (examError || !exam) {
         return new Response(JSON.stringify({ error: "الاختبار غير موجود" }), {
-          status: 404,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
       if (exam.status !== "منشور") {
         return new Response(JSON.stringify({ error: "الاختبار غير متاح حاليًا" }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
       if (exam.subject !== subject || !exam.target_classes.includes(classNumber)) {
         return new Response(JSON.stringify({ error: "هذا الاختبار غير متاح لك" }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
       const orderedQuestions = await fetchAndMergeQuestions(adminClient, exam.id);
       if (!orderedQuestions) {
         return new Response(JSON.stringify({ error: "لا توجد أسئلة في هذا الاختبار" }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
@@ -108,8 +138,7 @@ serve(async (req) => {
 
     if (examsError) {
       return new Response(JSON.stringify({ error: "حدث خطأ في البحث عن الاختبارات" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -120,14 +149,12 @@ serve(async (req) => {
       );
     }
 
-    // If exactly one exam, return its questions directly
     if (exams.length === 1) {
       const exam = exams[0];
       const orderedQuestions = await fetchAndMergeQuestions(adminClient, exam.id);
       if (!orderedQuestions) {
         return new Response(JSON.stringify({ error: "لا توجد أسئلة في هذا الاختبار" }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
@@ -137,13 +164,12 @@ serve(async (req) => {
       );
     }
 
-    // Multiple exams: return list for selection
     return new Response(
       JSON.stringify({ exams }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), {
+    return new Response(JSON.stringify({ error: "حدث خطأ في الخادم" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
