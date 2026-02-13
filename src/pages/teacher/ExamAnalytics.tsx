@@ -4,30 +4,35 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
-import { ArrowRight, ChevronDown, Users, TrendingUp, Award, Target } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { ArrowRight, Users, TrendingUp, Award, Target, AlertTriangle, Eye } from "lucide-react";
 
-interface QuestionDetail {
+interface QuestionAnalysis {
   questionId: string;
-  questionNumber: number;
-  questionType: string;
-  correctAnswer: string;
+  questionOrder: number;
+  sourceType: string;
   correctCount: number;
   wrongCount: number;
-  unansweredCount: number;
   totalCount: number;
   correctPct: number;
-  wrongPct: number;
-  unansweredPct: number;
-  difficulty: string;
-  optionCounts: Record<string, number>;
+}
+
+interface QuestionPreview {
   questionText?: string;
-  source: string;
+  optionA?: string;
+  optionB?: string;
+  optionC?: string;
+  optionD?: string;
+  correctAnswer?: string;
+  pageImageName?: string;
+  frameTop?: number;
+  frameLeft?: number;
+  frameWidth?: number;
+  frameHeight?: number;
+  sourceType: string;
 }
 
 const ExamAnalytics = () => {
@@ -37,13 +42,19 @@ const ExamAnalytics = () => {
   const [examName, setExamName] = useState("");
   const [loading, setLoading] = useState(true);
   const [totalStudents, setTotalStudents] = useState(0);
-  const [avgScore, setAvgScore] = useState(0);
-  const [highScore, setHighScore] = useState(0);
-  const [lowScore, setLowScore] = useState(0);
+  const [avgScorePct, setAvgScorePct] = useState(0);
+  const [highScorePct, setHighScorePct] = useState(0);
+  const [lowScorePct, setLowScorePct] = useState(0);
   const [successRate, setSuccessRate] = useState(0);
   const [scoreDistribution, setScoreDistribution] = useState<{ range: string; count: number }[]>([]);
-  const [questions, setQuestions] = useState<QuestionDetail[]>([]);
-  const [openQuestions, setOpenQuestions] = useState<Set<string>>(new Set());
+  const [questions, setQuestions] = useState<QuestionAnalysis[]>([]);
+  const [performanceGap, setPerformanceGap] = useState(0);
+
+  // Question preview dialog
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewData, setPreviewData] = useState<QuestionPreview | null>(null);
+  const [previewOrder, setPreviewOrder] = useState(0);
 
   useEffect(() => {
     if (!examId || !authUser) return;
@@ -76,14 +87,7 @@ const ExamAnalytics = () => {
         return;
       }
 
-      // Summary stats
-      const scores = attempts.map((a) => a.approved_score ?? 0);
-      setTotalStudents(attempts.length);
-      setAvgScore(Math.round((scores.reduce((s, v) => s + v, 0) / scores.length) * 100) / 100);
-      setHighScore(Math.max(...scores));
-      setLowScore(Math.min(...scores));
-
-      // Get exam questions to know total
+      // 3. Exam questions
       const { data: examQuestions } = await supabase
         .from("exam_questions")
         .select("question_id, question_order, source_type")
@@ -91,113 +95,73 @@ const ExamAnalytics = () => {
         .order("question_order");
 
       const totalQ = examQuestions?.length ?? 1;
-      const passThreshold = totalQ * 0.5;
-      const passCount = scores.filter((s) => s >= passThreshold).length;
-      setSuccessRate(Math.round((passCount / scores.length) * 100));
 
-      // Score distribution
+      // Summary stats as percentages
+      const scores = attempts.map((a) => a.approved_score ?? 0);
+      const scorePcts = scores.map((s) => (s / totalQ) * 100);
+      setTotalStudents(attempts.length);
+      setAvgScorePct(Math.round(scorePcts.reduce((s, v) => s + v, 0) / scorePcts.length));
+      const high = Math.round(Math.max(...scorePcts));
+      const low = Math.round(Math.min(...scorePcts));
+      setHighScorePct(high);
+      setLowScorePct(low);
+      setPerformanceGap(high - low);
+
+      const passCount = scorePcts.filter((p) => p >= 50).length;
+      setSuccessRate(Math.round((passCount / attempts.length) * 100));
+
+      // Score distribution - 4 ranges
       const dist = [
-        { range: "0-20%", count: 0 },
-        { range: "21-40%", count: 0 },
-        { range: "41-60%", count: 0 },
-        { range: "61-80%", count: 0 },
-        { range: "81-100%", count: 0 },
+        { range: "90-100%", count: 0 },
+        { range: "70-89%", count: 0 },
+        { range: "50-69%", count: 0 },
+        { range: "أقل من 50%", count: 0 },
       ];
-      scores.forEach((s) => {
-        const pct = (s / totalQ) * 100;
-        if (pct <= 20) dist[0].count++;
-        else if (pct <= 40) dist[1].count++;
-        else if (pct <= 60) dist[2].count++;
-        else if (pct <= 80) dist[3].count++;
-        else dist[4].count++;
+      scorePcts.forEach((pct) => {
+        if (pct >= 90) dist[0].count++;
+        else if (pct >= 70) dist[1].count++;
+        else if (pct >= 50) dist[2].count++;
+        else dist[3].count++;
       });
       setScoreDistribution(dist);
 
-      // 3. Student answers
+      // 4. Student answers
       const attemptIds = attempts.map((a) => a.id);
-      const allAnswers: { question_id: string; student_answer: string | null; auto_correct: boolean | null }[] = [];
-      
-      // Batch fetch answers (handle >1000 attempts)
+      const allAnswers: { question_id: string; auto_correct: boolean | null }[] = [];
+
       for (let i = 0; i < attemptIds.length; i += 500) {
         const batch = attemptIds.slice(i, i + 500);
         const { data } = await supabase
           .from("student_answers")
-          .select("question_id, student_answer, auto_correct")
+          .select("question_id, auto_correct")
           .in("attempt_id", batch);
         if (data) allAnswers.push(...data);
       }
 
-      // 4. Question details
+      // 5. Build question analytics
       if (!examQuestions?.length) {
         setLoading(false);
         return;
       }
 
-      const imageQIds = examQuestions.filter((q) => q.source_type === "image").map((q) => q.question_id);
-      const textQIds = examQuestions.filter((q) => q.source_type === "text").map((q) => q.question_id);
-
-      const [{ data: imageQs }, { data: textQs }] = await Promise.all([
-        imageQIds.length
-          ? supabase.from("question_bank").select("id, question_number, question_type, correct_answer").in("id", imageQIds)
-          : Promise.resolve({ data: [] }),
-        textQIds.length
-          ? supabase.from("text_question_bank").select("id, question_number, question_type, correct_answer, question_text").in("id", textQIds)
-          : Promise.resolve({ data: [] }),
-      ]);
-
-      const qInfoMap = new Map<string, { questionNumber: number; questionType: string; correctAnswer: string; questionText?: string; source: string }>();
-      imageQs?.forEach((q) => qInfoMap.set(q.id, { questionNumber: q.question_number, questionType: q.question_type, correctAnswer: q.correct_answer, source: "image" }));
-      textQs?.forEach((q) => qInfoMap.set(q.id, { questionNumber: q.question_number, questionType: q.question_type, correctAnswer: q.correct_answer, questionText: q.question_text ?? undefined, source: "text" }));
-
-      // Build question analytics
-      const qAnalytics: QuestionDetail[] = [];
-      const orderMap = new Map(examQuestions.map((eq) => [eq.question_id, eq.question_order]));
-
-      for (const eq of examQuestions) {
-        const info = qInfoMap.get(eq.question_id);
-        if (!info) continue;
-
+      const qAnalytics: QuestionAnalysis[] = examQuestions.map((eq) => {
         const qAnswers = allAnswers.filter((a) => a.question_id === eq.question_id);
         const total = attempts.length;
-        const answered = qAnswers.filter((a) => a.student_answer && a.student_answer.trim() !== "");
         const correct = qAnswers.filter((a) => a.auto_correct === true).length;
-        const wrong = answered.length - correct;
-        const unanswered = total - answered.length;
-
+        const wrong = total - correct;
         const correctPct = total > 0 ? Math.round((correct / total) * 100) : 0;
-        const wrongPct = total > 0 ? Math.round((wrong / total) * 100) : 0;
-        const unansweredPct = total > 0 ? Math.round((unanswered / total) * 100) : 0;
 
-        const difficulty = correctPct > 70 ? "سهل" : correctPct >= 40 ? "متوسط" : "صعب";
-
-        // Option counts for MCQ
-        const optionCounts: Record<string, number> = { أ: 0, ب: 0, ج: 0, د: 0 };
-        qAnswers.forEach((a) => {
-          if (a.student_answer && optionCounts.hasOwnProperty(a.student_answer)) {
-            optionCounts[a.student_answer]++;
-          }
-        });
-
-        qAnalytics.push({
+        return {
           questionId: eq.question_id,
-          questionNumber: orderMap.get(eq.question_id) ?? info.questionNumber,
-          questionType: info.questionType,
-          correctAnswer: info.correctAnswer,
+          questionOrder: eq.question_order,
+          sourceType: eq.source_type,
           correctCount: correct,
           wrongCount: wrong,
-          unansweredCount: unanswered,
           totalCount: total,
           correctPct,
-          wrongPct,
-          unansweredPct,
-          difficulty,
-          optionCounts,
-          questionText: info.questionText,
-          source: info.source,
-        });
-      }
+        };
+      });
 
-      qAnalytics.sort((a, b) => a.questionNumber - b.questionNumber);
       setQuestions(qAnalytics);
       setLoading(false);
     };
@@ -205,39 +169,61 @@ const ExamAnalytics = () => {
     fetchData();
   }, [examId, authUser]);
 
-  const toggleQuestion = (id: string) => {
-    setOpenQuestions((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  // Get hardest 5 and easiest 3
+  const sortedByDifficulty = [...questions].sort((a, b) => a.correctPct - b.correctPct);
+  const hardest5 = sortedByDifficulty.slice(0, 5);
+  const easiest3 = [...questions].sort((a, b) => b.correctPct - a.correctPct).slice(0, 3);
+
+  // Question preview handler
+  const openQuestionPreview = async (q: QuestionAnalysis) => {
+    setPreviewOrder(q.questionOrder);
+    setPreviewOpen(true);
+    setPreviewLoading(true);
+    setPreviewData(null);
+
+    if (q.sourceType === "text") {
+      const { data } = await supabase
+        .from("text_question_bank")
+        .select("question_text, option_a, option_b, option_c, option_d, correct_answer")
+        .eq("id", q.questionId)
+        .single();
+
+      if (data) {
+        setPreviewData({
+          questionText: data.question_text,
+          optionA: data.option_a,
+          optionB: data.option_b,
+          optionC: data.option_c,
+          optionD: data.option_d,
+          correctAnswer: data.correct_answer,
+          sourceType: "text",
+        });
+      }
+    } else {
+      const { data } = await supabase
+        .from("question_bank")
+        .select("page_image_name, frame_top, frame_left, frame_width, frame_height, correct_answer")
+        .eq("id", q.questionId)
+        .single();
+
+      if (data) {
+        setPreviewData({
+          pageImageName: data.page_image_name,
+          frameTop: data.frame_top,
+          frameLeft: data.frame_left,
+          frameWidth: data.frame_width,
+          frameHeight: data.frame_height,
+          correctAnswer: data.correct_answer,
+          sourceType: "image",
+        });
+      }
+    }
+    setPreviewLoading(false);
   };
 
-  const getDifficultyBadge = (difficulty: string) => {
-    const styles: Record<string, string> = {
-      "سهل": "bg-green-100 text-green-700 border-green-200",
-      "متوسط": "bg-yellow-100 text-yellow-700 border-yellow-200",
-      "صعب": "bg-red-100 text-red-700 border-red-200",
-    };
-    return <Badge variant="outline" className={styles[difficulty] || ""}>{difficulty}</Badge>;
-  };
-
-  const getOptionBar = (option: string, count: number, total: number, isCorrect: boolean, isMostWrong: boolean) => {
-    const pct = total > 0 ? Math.round((count / total) * 100) : 0;
-    let barColor = "bg-muted";
-    if (isCorrect) barColor = "bg-green-500";
-    else if (isMostWrong && count > 0) barColor = "bg-orange-400";
-
-    return (
-      <div key={option} className="flex items-center gap-3 text-sm">
-        <span className={`w-8 font-bold text-center ${isCorrect ? "text-green-700" : ""}`}>{option}</span>
-        <div className="flex-1 h-6 bg-muted/30 rounded-full overflow-hidden">
-          <div className={`h-full ${barColor} rounded-full transition-all`} style={{ width: `${pct}%` }} />
-        </div>
-        <span className="w-16 text-left text-muted-foreground">{count} ({pct}%)</span>
-      </div>
-    );
+  const getImageUrl = (pageImageName: string) => {
+    const { data } = supabase.storage.from("question-images").getPublicUrl(`shared/${pageImageName}`);
+    return data.publicUrl;
   };
 
   if (loading) {
@@ -279,7 +265,7 @@ const ExamAnalytics = () => {
         ) : (
           <>
             {/* Summary Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
               <Card>
                 <CardContent className="pt-6 text-center">
                   <Users className="h-8 w-8 mx-auto mb-2 text-primary" />
@@ -290,15 +276,22 @@ const ExamAnalytics = () => {
               <Card>
                 <CardContent className="pt-6 text-center">
                   <TrendingUp className="h-8 w-8 mx-auto mb-2 text-primary" />
-                  <p className="text-2xl font-bold">{avgScore}</p>
+                  <p className="text-2xl font-bold">{avgScorePct}%</p>
                   <p className="text-sm text-muted-foreground">متوسط الدرجات</p>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="pt-6 text-center">
-                  <Award className="h-8 w-8 mx-auto mb-2 text-primary" />
-                  <p className="text-2xl font-bold">{highScore} / {lowScore}</p>
-                  <p className="text-sm text-muted-foreground">أعلى / أدنى درجة</p>
+                  <Award className="h-8 w-8 mx-auto mb-2 text-green-600" />
+                  <p className="text-2xl font-bold">{highScorePct}%</p>
+                  <p className="text-sm text-muted-foreground">أعلى درجة</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6 text-center">
+                  <Award className="h-8 w-8 mx-auto mb-2 text-red-500" />
+                  <p className="text-2xl font-bold">{lowScorePct}%</p>
+                  <p className="text-sm text-muted-foreground">أدنى درجة</p>
                 </CardContent>
               </Card>
               <Card>
@@ -310,108 +303,201 @@ const ExamAnalytics = () => {
               </Card>
             </div>
 
-            {/* Score Distribution Chart */}
+            {/* Performance Gap Indicator */}
+            {performanceGap > 40 && (
+              <Card className="border-orange-300 bg-orange-50">
+                <CardContent className="py-4 flex items-center gap-3">
+                  <AlertTriangle className="h-6 w-6 text-orange-600 shrink-0" />
+                  <p className="text-orange-800 font-medium">
+                    يوجد تفاوت واضح في مستوى الطالبات داخل الفصل (فجوة الأداء: {performanceGap}%)
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Score Distribution */}
             <Card>
               <CardHeader>
                 <CardTitle>توزيع الدرجات</CardTitle>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={250}>
-                  <BarChart data={scoreDistribution}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="range" />
-                    <YAxis allowDecimals={false} />
-                    <Tooltip formatter={(value: number) => [value, "عدد الطالبات"]} />
-                    <Bar dataKey="count" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+                <div className="grid md:grid-cols-2 gap-6">
+                  {/* Table */}
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-right">الشريحة</TableHead>
+                        <TableHead className="text-right">عدد الطالبات</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {scoreDistribution.map((d) => (
+                        <TableRow key={d.range}>
+                          <TableCell className="font-medium">{d.range}</TableCell>
+                          <TableCell>{d.count}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  {/* Chart */}
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart data={scoreDistribution}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="range" />
+                      <YAxis allowDecimals={false} />
+                      <Tooltip formatter={(value: number) => [value, "عدد الطالبات"]} />
+                      <Bar dataKey="count" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </CardContent>
             </Card>
 
-            {/* Question Analysis Table */}
+            {/* Hardest 5 Questions */}
             <Card>
               <CardHeader>
-                <CardTitle>تحليل الأسئلة</CardTitle>
+                <CardTitle>أصعب 5 أسئلة</CardTitle>
               </CardHeader>
               <CardContent className="p-0">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="text-right">السؤال</TableHead>
-                      <TableHead className="text-right">الصواب</TableHead>
-                      <TableHead className="text-right">الخطأ</TableHead>
-                      <TableHead className="text-right">لم تجب</TableHead>
-                      <TableHead className="text-right">التصنيف</TableHead>
-                      <TableHead className="text-right w-10"></TableHead>
+                      <TableHead className="text-right">رقم السؤال</TableHead>
+                      <TableHead className="text-right">نسبة الإجابة الصحيحة</TableHead>
+                      <TableHead className="text-right">عدد الإجابات الخاطئة</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {questions.map((q) => {
-                      const isOpen = openQuestions.has(q.questionId);
-                      const isMCQ = q.questionType === "اختيار" || q.questionType === "multiple_choice";
+                    {hardest5.map((q) => (
+                      <TableRow key={q.questionId}>
+                        <TableCell>
+                          <Button
+                            variant="link"
+                            className="p-0 h-auto text-primary font-bold"
+                            onClick={() => openQuestionPreview(q)}
+                          >
+                            <Eye className="h-4 w-4 ml-1" />
+                            سؤال {q.questionOrder}
+                          </Button>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-green-600 font-semibold">{q.correctPct}%</span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-red-500 font-semibold">{q.wrongCount}</span>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
 
-                      // Find most selected wrong option
-                      const wrongOptions = Object.entries(q.optionCounts).filter(([opt]) => opt !== q.correctAnswer);
-                      const mostWrongOption = wrongOptions.length > 0
-                        ? wrongOptions.reduce((a, b) => (b[1] > a[1] ? b : a))[0]
-                        : "";
-
-                      return (
-                        <Collapsible key={q.questionId} open={isOpen} onOpenChange={() => toggleQuestion(q.questionId)} asChild>
-                          <>
-                            <CollapsibleTrigger asChild>
-                              <TableRow className="cursor-pointer hover:bg-muted/50">
-                                <TableCell className="font-medium">
-                                  سؤال {q.questionNumber}
-                                  {q.questionText && (
-                                    <span className="block text-xs text-muted-foreground truncate max-w-[200px]">{q.questionText}</span>
-                                  )}
-                                </TableCell>
-                                <TableCell>
-                                  <span className="text-green-600 font-semibold">{q.correctPct}%</span>
-                                </TableCell>
-                                <TableCell>
-                                  <span className="text-red-500 font-semibold">{q.wrongPct}%</span>
-                                </TableCell>
-                                <TableCell>
-                                  <span className="text-muted-foreground">{q.unansweredPct}%</span>
-                                </TableCell>
-                                <TableCell>{getDifficultyBadge(q.difficulty)}</TableCell>
-                                <TableCell>
-                                  {isMCQ && <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`} />}
-                                </TableCell>
-                              </TableRow>
-                            </CollapsibleTrigger>
-                            {isMCQ && (
-                              <CollapsibleContent asChild>
-                                <TableRow>
-                                  <TableCell colSpan={6} className="bg-muted/20 px-8 py-4">
-                                    <div className="space-y-2 max-w-md">
-                                      <p className="text-sm font-medium mb-3">توزيع الإجابات:</p>
-                                      {["أ", "ب", "ج", "د"].map((opt) =>
-                                        getOptionBar(
-                                          opt,
-                                          q.optionCounts[opt] || 0,
-                                          q.totalCount,
-                                          opt === q.correctAnswer,
-                                          opt === mostWrongOption
-                                        )
-                                      )}
-                                    </div>
-                                  </TableCell>
-                                </TableRow>
-                              </CollapsibleContent>
-                            )}
-                          </>
-                        </Collapsible>
-                      );
-                    })}
+            {/* Easiest 3 Questions */}
+            <Card>
+              <CardHeader>
+                <CardTitle>أسهل 3 أسئلة</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-right">رقم السؤال</TableHead>
+                      <TableHead className="text-right">نسبة الإجابة الصحيحة</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {easiest3.map((q) => (
+                      <TableRow key={q.questionId}>
+                        <TableCell>
+                          <Button
+                            variant="link"
+                            className="p-0 h-auto text-primary font-bold"
+                            onClick={() => openQuestionPreview(q)}
+                          >
+                            <Eye className="h-4 w-4 ml-1" />
+                            سؤال {q.questionOrder}
+                          </Button>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-green-600 font-semibold">{q.correctPct}%</span>
+                        </TableCell>
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
               </CardContent>
             </Card>
           </>
         )}
+
+        {/* Question Preview Dialog */}
+        <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+          <DialogContent className="max-w-lg" dir="rtl">
+            <DialogHeader>
+              <DialogTitle>معاينة سؤال {previewOrder}</DialogTitle>
+            </DialogHeader>
+            {previewLoading ? (
+              <div className="flex justify-center py-8">
+                <div className="h-6 w-6 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+              </div>
+            ) : previewData ? (
+              <div className="space-y-4">
+                {previewData.sourceType === "text" ? (
+                  <>
+                    <p className="font-medium text-base leading-relaxed">{previewData.questionText}</p>
+                    <div className="space-y-2 text-sm">
+                      {[
+                        { label: "أ", value: previewData.optionA },
+                        { label: "ب", value: previewData.optionB },
+                        { label: "ج", value: previewData.optionC },
+                        { label: "د", value: previewData.optionD },
+                      ].map((opt) => (
+                        <div
+                          key={opt.label}
+                          className={`p-2 rounded border ${
+                            opt.label === previewData.correctAnswer
+                              ? "border-green-400 bg-green-50 font-semibold"
+                              : "border-border"
+                          }`}
+                        >
+                          <span className="font-bold ml-2">{opt.label})</span>
+                          {opt.value}
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : previewData.pageImageName ? (
+                  <div className="relative w-full overflow-hidden rounded border">
+                    <div
+                      style={{
+                        position: "relative",
+                        width: "100%",
+                        overflow: "hidden",
+                      }}
+                    >
+                      <img
+                        src={getImageUrl(previewData.pageImageName)}
+                        alt="صورة السؤال"
+                        className="w-full"
+                        style={{
+                          clipPath: `inset(${(previewData.frameTop ?? 0) * 100}% ${(1 - (previewData.frameLeft ?? 0) - (previewData.frameWidth ?? 1)) * 100}% ${(1 - (previewData.frameTop ?? 0) - (previewData.frameHeight ?? 1)) * 100}% ${(previewData.frameLeft ?? 0) * 100}%)`,
+                        }}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      الإجابة الصحيحة: <span className="font-bold text-green-600">{previewData.correctAnswer}</span>
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground">لا يمكن عرض السؤال</p>
+                )}
+              </div>
+            ) : (
+              <p className="text-muted-foreground text-center py-4">لا يمكن تحميل بيانات السؤال</p>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );
