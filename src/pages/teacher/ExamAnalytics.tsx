@@ -19,6 +19,22 @@ interface StudentScore {
   pct: number;
 }
 
+interface ClassQuestionStat {
+  questionId: string;
+  questionOrder: number;
+  sourceType: string;
+  correctPct: number;
+  wrongCount: number;
+}
+
+interface ClassStudentStat {
+  name: string;
+  score: number;
+  totalQ: number;
+  pct: number;
+  classNumber: number;
+}
+
 interface ClassStats {
   classNumber: number;
   studentCount: number;
@@ -26,6 +42,9 @@ interface ClassStats {
   highPct: number;
   lowPct: number;
   passRate: number;
+  hardest3: ClassQuestionStat[];
+  easiest3: ClassQuestionStat[];
+  students: ClassStudentStat[];
 }
 
 interface QuestionAnalysis {
@@ -147,15 +166,15 @@ const ExamAnalytics = () => {
       });
       setScoreDistribution(dist);
 
-      // 4. Student answers
+      // 4. Student answers (include attempt_id for per-class analysis)
       const attemptIds = attempts.map((a) => a.id);
-      const allAnswers: { question_id: string; auto_correct: boolean | null }[] = [];
+      const allAnswers: { question_id: string; auto_correct: boolean | null; attempt_id: string }[] = [];
 
       for (let i = 0; i < attemptIds.length; i += 500) {
         const batch = attemptIds.slice(i, i + 500);
         const { data } = await supabase
           .from("student_answers")
-          .select("question_id, auto_correct")
+          .select("question_id, auto_correct, attempt_id")
           .in("attempt_id", batch);
         if (data) allAnswers.push(...data);
       }
@@ -201,27 +220,60 @@ const ExamAnalytics = () => {
       stuScores.sort((a, b) => b.pct - a.pct);
       setStudentScores(stuScores);
 
-      // 7. Class-level analytics
+      // 7. Class-level analytics with per-class question analysis
+      // Build attempt -> class map
+      const attemptClassMap = new Map<string, number>();
+      attempts.forEach((a) => attemptClassMap.set(a.id, a.class_number));
+
       const classMap = new Map<number, number[]>();
       stuScores.forEach((s) => {
         if (!classMap.has(s.classNumber)) classMap.set(s.classNumber, []);
         classMap.get(s.classNumber)!.push(s.pct);
       });
 
-      if (classMap.size > 1) {
-        const cStats: ClassStats[] = [];
-        classMap.forEach((pcts, cn) => {
-          const avg = Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length);
-          const hi = Math.max(...pcts);
-          const lo = Math.min(...pcts);
-          const pass = Math.round((pcts.filter((p) => p >= 50).length / pcts.length) * 100);
-          cStats.push({ classNumber: cn, studentCount: pcts.length, avgPct: avg, highPct: hi, lowPct: lo, passRate: pass });
+      const cStats: ClassStats[] = [];
+      classMap.forEach((pcts, cn) => {
+        const avg = Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length);
+        const hi = Math.max(...pcts);
+        const lo = Math.min(...pcts);
+        const pass = Math.round((pcts.filter((p) => p >= 50).length / pcts.length) * 100);
+
+        // Per-class question analysis
+        const classAttemptIds = new Set(
+          attempts.filter((a) => a.class_number === cn).map((a) => a.id)
+        );
+        const classAnswers = allAnswers.filter((a) => classAttemptIds.has(a.attempt_id));
+        const classStudentCount = classAttemptIds.size;
+
+        const classQStats: ClassQuestionStat[] = (examQuestions ?? []).map((eq) => {
+          const qAns = classAnswers.filter((a) => a.question_id === eq.question_id);
+          const correct = qAns.filter((a) => a.auto_correct === true).length;
+          const wrong = classStudentCount - correct;
+          const correctPct = classStudentCount > 0 ? Math.round((correct / classStudentCount) * 100) : 0;
+          return {
+            questionId: eq.question_id,
+            questionOrder: eq.question_order,
+            sourceType: eq.source_type,
+            correctPct,
+            wrongCount: wrong,
+          };
         });
-        cStats.sort((a, b) => a.classNumber - b.classNumber);
-        setClassStats(cStats);
-      } else {
-        setClassStats([]);
-      }
+
+        const sortedAsc = [...classQStats].sort((a, b) => a.correctPct - b.correctPct);
+        const hardest3 = sortedAsc.slice(0, 3);
+        const easiest3 = [...classQStats].sort((a, b) => b.correctPct - a.correctPct).slice(0, 3);
+
+        const students: ClassStudentStat[] = stuScores
+          .filter((s) => s.classNumber === cn)
+          .map((s) => ({ name: s.studentName, score: s.score, totalQ: s.totalQ, pct: s.pct, classNumber: s.classNumber }));
+
+        cStats.push({
+          classNumber: cn, studentCount: pcts.length, avgPct: avg, highPct: hi, lowPct: lo, passRate: pass,
+          hardest3, easiest3, students,
+        });
+      });
+      cStats.sort((a, b) => a.classNumber - b.classNumber);
+      setClassStats(cStats);
 
       setLoading(false);
     };
@@ -538,41 +590,151 @@ const ExamAnalytics = () => {
               </Card>
             )}
 
-            {/* Class-Level Analytics */}
+            {/* Class-Level Diagnostic Analytics */}
             {classStats.length > 0 && (
-              <div className="space-y-4">
+              <div className="space-y-6">
                 <h3 className="text-xl font-bold">تحليلات الفصول</h3>
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {classStats.map((cs) => (
-                    <Card key={cs.classNumber}>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-lg">فصل {cs.classNumber}</CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">عدد الطالبات</span>
-                          <span className="font-semibold">{cs.studentCount}</span>
+                {classStats.map((cs) => (
+                  <Card key={cs.classNumber}>
+                    <CardHeader>
+                      <CardTitle className="text-lg">فصل {cs.classNumber}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      {/* Summary row */}
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
+                        <div className="text-center p-3 rounded-lg bg-muted/50">
+                          <p className="font-bold text-lg">{cs.studentCount}</p>
+                          <p className="text-muted-foreground">طالبة</p>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">متوسط الدرجات</span>
-                          <span className="font-semibold">{cs.avgPct}%</span>
+                        <div className="text-center p-3 rounded-lg bg-muted/50">
+                          <p className="font-bold text-lg">{cs.avgPct}%</p>
+                          <p className="text-muted-foreground">المتوسط</p>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">أعلى درجة</span>
-                          <span className="font-semibold text-green-600">{cs.highPct}%</span>
+                        <div className="text-center p-3 rounded-lg bg-muted/50">
+                          <p className="font-bold text-lg text-green-600">{cs.highPct}%</p>
+                          <p className="text-muted-foreground">أعلى</p>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">أدنى درجة</span>
-                          <span className="font-semibold text-red-500">{cs.lowPct}%</span>
+                        <div className="text-center p-3 rounded-lg bg-muted/50">
+                          <p className="font-bold text-lg text-red-500">{cs.lowPct}%</p>
+                          <p className="text-muted-foreground">أدنى</p>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">نسبة النجاح</span>
-                          <span className="font-semibold">{cs.passRate}%</span>
+                        <div className="text-center p-3 rounded-lg bg-muted/50">
+                          <p className="font-bold text-lg">{cs.passRate}%</p>
+                          <p className="text-muted-foreground">نسبة النجاح</p>
                         </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                      </div>
+
+                      {/* Hardest & Easiest questions side by side */}
+                      <div className="grid md:grid-cols-2 gap-4">
+                        {/* Hardest 3 */}
+                        <div>
+                          <h4 className="font-semibold mb-2 text-red-600">أصعب 3 أسئلة في الفصل</h4>
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="text-right">السؤال</TableHead>
+                                <TableHead className="text-right">نسبة الصواب</TableHead>
+                                <TableHead className="text-right">عدد الخطأ</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {cs.hardest3.map((q) => (
+                                <TableRow key={q.questionId}>
+                                  <TableCell>
+                                    <Button
+                                      variant="link"
+                                      className="p-0 h-auto text-primary font-bold"
+                                      onClick={() => openQuestionPreview({ ...q, correctCount: 0, totalCount: 0 })}
+                                    >
+                                      <Eye className="h-4 w-4 ml-1" />
+                                      سؤال {q.questionOrder}
+                                    </Button>
+                                  </TableCell>
+                                  <TableCell>
+                                    <span className="text-green-600 font-semibold">{q.correctPct}%</span>
+                                  </TableCell>
+                                  <TableCell>
+                                    <span className="text-red-500 font-semibold">{q.wrongCount}</span>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+
+                        {/* Easiest 3 */}
+                        <div>
+                          <h4 className="font-semibold mb-2 text-green-600">أسهل 3 أسئلة في الفصل</h4>
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="text-right">السؤال</TableHead>
+                                <TableHead className="text-right">نسبة الصواب</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {cs.easiest3.map((q) => (
+                                <TableRow key={q.questionId}>
+                                  <TableCell>
+                                    <Button
+                                      variant="link"
+                                      className="p-0 h-auto text-primary font-bold"
+                                      onClick={() => openQuestionPreview({ ...q, correctCount: 0, totalCount: 0 })}
+                                    >
+                                      <Eye className="h-4 w-4 ml-1" />
+                                      سؤال {q.questionOrder}
+                                    </Button>
+                                  </TableCell>
+                                  <TableCell>
+                                    <span className="text-green-600 font-semibold">{q.correctPct}%</span>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
+
+                      {/* Students in this class */}
+                      <div>
+                        <h4 className="font-semibold mb-2">أداء الطالبات</h4>
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="text-right">الطالبة</TableHead>
+                              <TableHead className="text-right">الدرجة</TableHead>
+                              <TableHead className="text-right">النسبة</TableHead>
+                              <TableHead className="text-right">الملف</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {cs.students.map((st) => (
+                              <TableRow key={st.name}>
+                                <TableCell className="font-medium">{st.name}</TableCell>
+                                <TableCell>{st.score}/{st.totalQ}</TableCell>
+                                <TableCell>
+                                  <span className={st.pct >= 50 ? "text-green-600 font-semibold" : "text-red-500 font-semibold"}>
+                                    {st.pct}%
+                                  </span>
+                                </TableCell>
+                                <TableCell>
+                                  <Button
+                                    variant="link"
+                                    size="sm"
+                                    className="p-0 h-auto"
+                                    onClick={() => navigate(`/teacher/students/${st.name}/${st.classNumber}`)}
+                                  >
+                                    عرض الملف
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
             )}
           </>
