@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowRight, User, BookOpen, TrendingUp, TrendingDown, Minus, CheckCircle, XCircle, AlertCircle, Lightbulb, ThumbsUp, ThumbsDown } from "lucide-react";
+import { ArrowRight, User, BookOpen, TrendingUp, TrendingDown, Minus, CheckCircle, AlertCircle } from "lucide-react";
 
 interface AttemptData {
   id: string;
@@ -181,45 +181,6 @@ const StudentProfile = () => {
 
   const level = avgScore >= 80 ? "ممتاز" : avgScore >= 60 ? "جيد" : "يحتاج دعم";
 
-  // Strengths & Weaknesses by question type
-  const typeAnalysis = useMemo(() => {
-    const map = new Map<string, { correct: number; total: number; unanswered: number }>();
-    answers.forEach((a) => {
-      if (!map.has(a.question_type)) {
-        map.set(a.question_type, { correct: 0, total: 0, unanswered: 0 });
-      }
-      const entry = map.get(a.question_type)!;
-      entry.total++;
-      if (a.auto_correct === true) entry.correct++;
-      if (!a.student_answer || a.student_answer.trim() === "") entry.unanswered++;
-    });
-
-    const strengths: { type: string; pct: number }[] = [];
-    const weaknesses: { type: string; pct: number; unansweredPct: number }[] = [];
-
-    map.forEach((val, type) => {
-      const pct = Math.round((val.correct / val.total) * 100);
-      const uPct = Math.round((val.unanswered / val.total) * 100);
-      if (pct >= 70) strengths.push({ type, pct });
-      if (pct < 50) weaknesses.push({ type, pct, unansweredPct: uPct });
-    });
-
-    return { strengths, weaknesses };
-  }, [answers]);
-
-  // Recommendations
-  const recommendations = useMemo(() => {
-    const recs: string[] = [];
-    if (unansweredPct > 30) recs.push("تحتاج الطالبة لتشجيع على محاولة جميع الأسئلة");
-    typeAnalysis.weaknesses.forEach((w) => {
-      recs.push(`تحتاج دعم في أسئلة ${w.type}`);
-    });
-    if (trend === "تحسن") recs.push("تظهر الطالبة تحسناً ملحوظاً في الاختبارات الأخيرة");
-    if (level === "ممتاز") recs.push("أداء متميز - يمكن تكليفها بمهام إثرائية");
-    if (trend === "تراجع") recs.push("يُلاحظ تراجع في الأداء الأخير - قد تحتاج متابعة");
-    if (recs.length === 0) recs.push("أداء مستقر - يُنصح بمتابعة مستمرة");
-    return recs;
-  }, [unansweredPct, typeAnalysis, trend, level]);
 
   const TrendIcon = trend === "تحسن" ? TrendingUp : trend === "تراجع" ? TrendingDown : Minus;
   const trendColor = trend === "تحسن" ? "text-green-600" : trend === "تراجع" ? "text-red-500" : "text-muted-foreground";
@@ -310,60 +271,6 @@ const StudentProfile = () => {
           </Card>
         </div>
 
-        {/* Strengths & Weaknesses */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-green-700">
-                <ThumbsUp className="h-5 w-5" />
-                نقاط القوة
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {typeAnalysis.strengths.length === 0 ? (
-                <p className="text-muted-foreground text-sm">لا توجد بيانات كافية</p>
-              ) : (
-                <div className="space-y-3">
-                  {typeAnalysis.strengths.map((s) => (
-                    <div key={s.type} className="flex items-center justify-between p-3 rounded-lg bg-green-50 dark:bg-green-950/20">
-                      <span className="font-medium">{s.type}</span>
-                      <Badge variant="default">{s.pct}% صواب</Badge>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-red-600">
-                <ThumbsDown className="h-5 w-5" />
-                نقاط الضعف
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {typeAnalysis.weaknesses.length === 0 ? (
-                <p className="text-muted-foreground text-sm">لا توجد نقاط ضعف واضحة</p>
-              ) : (
-                <div className="space-y-3">
-                  {typeAnalysis.weaknesses.map((w) => (
-                    <div key={w.type} className="flex items-center justify-between p-3 rounded-lg bg-red-50 dark:bg-red-950/20">
-                      <span className="font-medium">{w.type}</span>
-                      <div className="flex gap-2">
-                        <Badge variant="destructive">{w.pct}% صواب</Badge>
-                        {w.unansweredPct > 20 && (
-                          <Badge variant="outline">{w.unansweredPct}% بلا إجابة</Badge>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
         {/* Exam History */}
         <Card>
           <CardHeader>
@@ -405,25 +312,6 @@ const StudentProfile = () => {
           </CardContent>
         </Card>
 
-        {/* Smart Recommendations */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Lightbulb className="h-5 w-5 text-yellow-500" />
-              توصيات ذكية
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {recommendations.map((rec, i) => (
-                <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
-                  <XCircle className="h-5 w-5 text-primary mt-0.5 shrink-0" />
-                  <p className="text-sm">{rec}</p>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </DashboardLayout>
   );
