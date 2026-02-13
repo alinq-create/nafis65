@@ -8,7 +8,25 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { ArrowRight, Users, TrendingUp, Award, Target, AlertTriangle, Eye } from "lucide-react";
+import { ArrowRight, Users, TrendingUp, Award, Target, AlertTriangle, Eye, UserCheck } from "lucide-react";
+
+interface StudentScore {
+  id: string;
+  studentName: string;
+  classNumber: number;
+  score: number;
+  totalQ: number;
+  pct: number;
+}
+
+interface ClassStats {
+  classNumber: number;
+  studentCount: number;
+  avgPct: number;
+  highPct: number;
+  lowPct: number;
+  passRate: number;
+}
 
 interface QuestionAnalysis {
   questionId: string;
@@ -56,6 +74,10 @@ const ExamAnalytics = () => {
   const [previewData, setPreviewData] = useState<QuestionPreview | null>(null);
   const [previewOrder, setPreviewOrder] = useState(0);
 
+  // Student & class level data
+  const [studentScores, setStudentScores] = useState<StudentScore[]>([]);
+  const [classStats, setClassStats] = useState<ClassStats[]>([]);
+
   useEffect(() => {
     if (!examId || !authUser) return;
 
@@ -78,7 +100,7 @@ const ExamAnalytics = () => {
       // 2. Approved attempts
       const { data: attempts } = await supabase
         .from("student_attempts")
-        .select("id, approved_score")
+        .select("id, approved_score, student_name, class_number")
         .eq("exam_id", examId)
         .eq("status", "معتمد");
 
@@ -163,6 +185,44 @@ const ExamAnalytics = () => {
       });
 
       setQuestions(qAnalytics);
+
+      // 6. Student scores table
+      const stuScores: StudentScore[] = attempts.map((a) => {
+        const pct = Math.round(((a.approved_score ?? 0) / totalQ) * 100);
+        return {
+          id: a.id,
+          studentName: a.student_name,
+          classNumber: a.class_number,
+          score: a.approved_score ?? 0,
+          totalQ,
+          pct,
+        };
+      });
+      stuScores.sort((a, b) => b.pct - a.pct);
+      setStudentScores(stuScores);
+
+      // 7. Class-level analytics
+      const classMap = new Map<number, number[]>();
+      stuScores.forEach((s) => {
+        if (!classMap.has(s.classNumber)) classMap.set(s.classNumber, []);
+        classMap.get(s.classNumber)!.push(s.pct);
+      });
+
+      if (classMap.size > 1) {
+        const cStats: ClassStats[] = [];
+        classMap.forEach((pcts, cn) => {
+          const avg = Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length);
+          const hi = Math.max(...pcts);
+          const lo = Math.min(...pcts);
+          const pass = Math.round((pcts.filter((p) => p >= 50).length / pcts.length) * 100);
+          cStats.push({ classNumber: cn, studentCount: pcts.length, avgPct: avg, highPct: hi, lowPct: lo, passRate: pass });
+        });
+        cStats.sort((a, b) => a.classNumber - b.classNumber);
+        setClassStats(cStats);
+      } else {
+        setClassStats([]);
+      }
+
       setLoading(false);
     };
 
@@ -428,6 +488,93 @@ const ExamAnalytics = () => {
                 </Table>
               </CardContent>
             </Card>
+
+            {/* Student Scores Table */}
+            {studentScores.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <UserCheck className="h-5 w-5" />
+                    درجات الطالبات
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-right">اسم الطالبة</TableHead>
+                        <TableHead className="text-right">الفصل</TableHead>
+                        <TableHead className="text-right">الدرجة</TableHead>
+                        <TableHead className="text-right">النسبة</TableHead>
+                        <TableHead className="text-right">الملف</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {studentScores.map((s) => (
+                        <TableRow key={s.id}>
+                          <TableCell className="font-medium">{s.studentName}</TableCell>
+                          <TableCell>{s.classNumber}</TableCell>
+                          <TableCell>{s.score}/{s.totalQ}</TableCell>
+                          <TableCell>
+                            <span className={s.pct >= 50 ? "text-green-600 font-semibold" : "text-red-500 font-semibold"}>
+                              {s.pct}%
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="link"
+                              size="sm"
+                              className="p-0 h-auto"
+                              onClick={() => navigate(`/teacher/students/${s.studentName}/${s.classNumber}`)}
+                            >
+                              عرض الملف
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Class-Level Analytics */}
+            {classStats.length > 0 && (
+              <div className="space-y-4">
+                <h3 className="text-xl font-bold">تحليلات الفصول</h3>
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {classStats.map((cs) => (
+                    <Card key={cs.classNumber}>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-lg">فصل {cs.classNumber}</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">عدد الطالبات</span>
+                          <span className="font-semibold">{cs.studentCount}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">متوسط الدرجات</span>
+                          <span className="font-semibold">{cs.avgPct}%</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">أعلى درجة</span>
+                          <span className="font-semibold text-green-600">{cs.highPct}%</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">أدنى درجة</span>
+                          <span className="font-semibold text-red-500">{cs.lowPct}%</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">نسبة النجاح</span>
+                          <span className="font-semibold">{cs.passRate}%</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            )}
           </>
         )}
 
