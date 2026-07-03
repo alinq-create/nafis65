@@ -172,7 +172,7 @@ const StudentReport = () => {
   }
 
   return (
-    <div className="min-h-screen bg-white text-black p-8" dir="rtl" style={{ fontFamily: "'Noto Sans Arabic', sans-serif" }}>
+    <div className="min-h-screen bg-white text-black p-8" dir="rtl" style={{ fontFamily: "'Almarai', sans-serif" }}>
       {/* Action buttons */}
       <div className="no-print flex gap-3 mb-6">
         <Button onClick={() => window.print()} className="gap-2">
