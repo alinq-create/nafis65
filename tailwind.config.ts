@@ -14,7 +14,7 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ["'Noto Sans Arabic'", "sans-serif"],
+        sans: ["'Almarai'", "sans-serif"],
       },
       colors: {
         border: "hsl(var(--border))",
