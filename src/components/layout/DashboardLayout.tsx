@@ -91,7 +91,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   return (
     <div className="flex flex-col min-h-screen">
       {/* Top Header */}
-      <header className="relative overflow-hidden bg-gradient-to-l from-[hsl(145,55%,42%)] via-[hsl(199,70%,45%)] to-[hsl(35,85%,55%)] px-4 pt-3 pb-8 shadow-md">
+      <header className="relative -mt-px overflow-hidden bg-gradient-to-l from-[hsl(145,50%,52%)] via-[hsl(194,64%,55%)] to-[hsl(38,82%,62%)] px-5 pt-4 pb-12 shadow-[0_10px_28px_rgba(15,23,42,0.12)]">
         <div className="relative z-10 flex items-center gap-4">
           {/* Hamburger button - mobile only */}
           <button
@@ -105,11 +105,11 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
           <img
             src={schoolLogo}
             alt="شعار المدرسة المتوسطة 65"
-            className="h-12 w-12 rounded-full bg-white p-1 object-contain"
+            className="h-12 w-12 rounded-full bg-white/95 p-1.5 object-contain shadow-sm ring-1 ring-white/70"
           />
-          <div className="text-white">
-            <h1 className="text-lg font-bold leading-tight">منصة تدريب نافس</h1>
-            <p className="text-sm opacity-90">المتوسطة الخامسة والستون</p>
+          <div className="text-right text-white drop-shadow-sm">
+            <h1 className="text-lg font-extrabold leading-tight">منصة تدريب نافس</h1>
+            <p className="mt-0.5 text-sm font-bold opacity-95">المتوسطة الخامسة والستون</p>
           </div>
         </div>
         <HorizonDivider />
