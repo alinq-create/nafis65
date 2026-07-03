@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ArrowRight, Save, Pencil } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { useSignedImageUrls } from "@/lib/imageUrls";
 
 interface UnifiedQuestion {
   id: string;
@@ -60,6 +61,16 @@ const CreateNewExam = () => {
   const [questionsLoading, setQuestionsLoading] = useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const signedUrls = useSignedImageUrls(
+    questions.map((q) => {
+      if (!authUser || !q.page_image_name) return null;
+      const isOwn = q.teacher_id === authUser.user.id;
+      return isOwn
+        ? `${authUser.user.id}/${q.page_image_name}`
+        : `shared/${q.page_image_name}`;
+    })
+  );
 
   // Edit question states
   const [editingQuestion, setEditingQuestion] = useState<UnifiedQuestion | null>(null);

@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { ArrowRight, Users, TrendingUp, Award, Target, AlertTriangle, Eye, UserCheck } from "lucide-react";
+import { getSignedImageUrl } from "@/lib/imageUrls";
 
 interface StudentScore {
   id: string;
@@ -328,15 +329,16 @@ const ExamAnalytics = () => {
           correctAnswer: data.correct_answer,
           sourceType: "image",
         });
+        if (data.page_image_name) {
+          const url = await getSignedImageUrl(`shared/${data.page_image_name}`);
+          setPreviewImageUrl(url);
+        }
       }
     }
     setPreviewLoading(false);
   };
 
-  const getImageUrl = (pageImageName: string) => {
-    const { data } = supabase.storage.from("question-images").getPublicUrl(`shared/${pageImageName}`);
-    return data.publicUrl;
-  };
+  const [previewImageUrl, setPreviewImageUrl] = useState<string>("");
 
   if (loading) {
     return (
@@ -786,7 +788,7 @@ const ExamAnalytics = () => {
                       }}
                     >
                       <img
-                        src={getImageUrl(previewData.pageImageName)}
+                        src={previewImageUrl}
                         alt="صورة السؤال"
                         className="w-full"
                         style={{
