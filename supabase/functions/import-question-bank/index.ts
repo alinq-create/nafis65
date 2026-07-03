@@ -123,7 +123,8 @@ serve(async (req) => {
       .select("id");
 
     if (insertError) {
-      return new Response(JSON.stringify({ error: `خطأ في إدراج الأسئلة: ${insertError.message}` }), {
+      console.error("[import-question-bank] insert error:", insertError);
+      return new Response(JSON.stringify({ error: "خطأ في إدراج الأسئلة" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -137,7 +138,8 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), {
+    console.error("[import-question-bank] error:", err);
+    return new Response(JSON.stringify({ error: "حدث خطأ في الخادم" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
