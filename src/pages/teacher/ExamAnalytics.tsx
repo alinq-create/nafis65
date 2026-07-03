@@ -329,6 +329,10 @@ const ExamAnalytics = () => {
           correctAnswer: data.correct_answer,
           sourceType: "image",
         });
+        if (data.page_image_name) {
+          const url = await getSignedImageUrl(`shared/${data.page_image_name}`);
+          setPreviewImageUrl(url);
+        }
       }
     }
     setPreviewLoading(false);
@@ -784,7 +788,7 @@ const ExamAnalytics = () => {
                       }}
                     >
                       <img
-                        src={getImageUrl(previewData.pageImageName)}
+                        src={previewImageUrl}
                         alt="صورة السؤال"
                         className="w-full"
                         style={{
