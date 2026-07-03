@@ -43,7 +43,20 @@ async function fetchAndMergeQuestions(adminClient: any, examId: string) {
       : { data: [] },
   ]);
 
-  const imageMap = new Map((imageResult.data || []).map(q => [q.id, { ...q, source_type: "image" }]));
+  // Generate signed URLs for each image question (bucket is private)
+  const imageEntries = await Promise.all(
+    (imageResult.data || []).map(async (q: any) => {
+      let page_image_url = "";
+      if (q.page_image_name) {
+        const { data: signed } = await adminClient.storage
+          .from("question-images")
+          .createSignedUrl(`shared/${q.page_image_name}`, 3600);
+        page_image_url = signed?.signedUrl ?? "";
+      }
+      return [q.id, { ...q, source_type: "image", page_image_url }] as const;
+    })
+  );
+  const imageMap = new Map(imageEntries);
   const textMap = new Map((textResult.data || []).map(q => [q.id, { ...q, source_type: "text" }]));
 
   return examQuestions.map(eq => {
