@@ -1,4 +1,5 @@
 import schoolLogo from "@/assets/school-logo-65.png";
+import HorizonDivider from "@/components/layout/HorizonDivider";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -12,8 +13,8 @@ const AppShell = ({ children, hideHeader = false, hideFooter = false, headerExtr
     <div className="min-h-screen flex flex-col bg-background">
       {/* Header */}
       {!hideHeader &&
-      <header className="bg-gradient-to-l from-[hsl(145,55%,42%)] via-[hsl(199,70%,45%)] to-[hsl(35,85%,55%)] px-4 py-3 shadow-md">
-          <div className="flex items-center w-full">
+      <header className="relative overflow-hidden bg-gradient-to-l from-[hsl(145,55%,42%)] via-[hsl(199,70%,45%)] to-[hsl(35,85%,55%)] px-4 pt-3 pb-8 shadow-md">
+          <div className="relative z-10 flex items-center w-full">
             <div className="max-w-7xl mx-auto flex-1 flex items-center gap-4">
               <img
                 src={schoolLogo}
@@ -26,6 +27,7 @@ const AppShell = ({ children, hideHeader = false, hideFooter = false, headerExtr
             </div>
             {headerExtra && <div>{headerExtra}</div>}
           </div>
+          <HorizonDivider />
         </header>
       }
 
