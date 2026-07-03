@@ -14,6 +14,7 @@ interface ExamQuestion {
   id: string;
   question_type: string;
   page_image_name?: string;
+  page_image_url?: string;
   frame_top?: number;
   frame_left?: number;
   frame_width?: number;
@@ -48,12 +49,8 @@ const TakeExam = () => {
   const currentQuestion = sortedQuestions[currentIndex];
   const totalQuestions = sortedQuestions.length;
 
-  const getImageUrl = (imageName?: string) => {
-    if (!imageName) return '';
-    const { data } = supabase.storage
-      .from("question-images")
-      .getPublicUrl(`shared/${imageName}`);
-    return data.publicUrl;
+  const getImageUrl = (question?: ExamQuestion) => {
+    return question?.page_image_url || '';
   };
 
   const isTextQuestion = currentQuestion?.source_type === 'text';
@@ -129,7 +126,7 @@ const TakeExam = () => {
                   <div
                     className="w-full min-h-[300px] bg-muted"
                     style={{
-                      backgroundImage: `url(${getImageUrl(currentQuestion.page_image_name)})`,
+                      backgroundImage: `url(${getImageUrl(currentQuestion)})`,
                       backgroundSize: `${100 / (currentQuestion.frame_width || 1)}% ${100 / (currentQuestion.frame_height || 1)}%`,
                       backgroundPosition: `${((currentQuestion.frame_left || 0) / (1 - (currentQuestion.frame_width || 1))) * 100}% ${((currentQuestion.frame_top || 0) / (1 - (currentQuestion.frame_height || 1))) * 100}%`,
                       backgroundRepeat: "no-repeat",

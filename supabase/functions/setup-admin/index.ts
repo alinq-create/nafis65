@@ -78,7 +78,8 @@ serve(async (req) => {
     });
 
     if (authError) {
-      return new Response(JSON.stringify({ error: authError.message }), {
+      console.error("[setup-admin] auth error:", authError);
+      return new Response(JSON.stringify({ error: "تعذر إنشاء الحساب" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

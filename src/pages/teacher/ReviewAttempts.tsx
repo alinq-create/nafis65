@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle, XCircle, ChevronLeft, ChevronRight, Eye, Loader2, ArrowRight } from "lucide-react";
+import { useSignedImageUrls } from "@/lib/imageUrls";
 
 interface AttemptWithExam {
   id: string;
@@ -67,6 +68,10 @@ const ReviewAttempts = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingReview, setIsLoadingReview] = useState(false);
   const { toast } = useToast();
+
+  const signedUrls = useSignedImageUrls(
+    questions.map((q) => (q.page_image_name ? `shared/${q.page_image_name}` : null))
+  );
 
   const fetchAttempts = async () => {
     if (!authUser) return;
@@ -173,10 +178,7 @@ const ReviewAttempts = () => {
 
   const getImageUrl = (imageName?: string | null) => {
     if (!imageName) return "";
-    const { data } = supabase.storage
-      .from("question-images")
-      .getPublicUrl(`shared/${imageName}`);
-    return data.publicUrl;
+    return signedUrls[`shared/${imageName}`] || "";
   };
 
   const getOptionStyle = (

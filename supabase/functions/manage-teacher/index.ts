@@ -95,7 +95,8 @@ serve(async (req) => {
       });
 
       if (authError) {
-        return new Response(JSON.stringify({ error: authError.message }), {
+        console.error("[manage-teacher] auth error:", authError);
+        return new Response(JSON.stringify({ error: "تعذر إنشاء حساب المعلمة" }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -195,7 +196,8 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), {
+    console.error("[manage-teacher] error:", err);
+    return new Response(JSON.stringify({ error: "حدث خطأ في الخادم" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
