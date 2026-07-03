@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useToast } from "@/hooks/use-toast";
 import { Trash2 } from "lucide-react";
 import ImageCropEditor from "@/components/teacher/ImageCropEditor";
+import { useSignedImageUrls } from "@/lib/imageUrls";
 
 interface UnifiedQuestion {
   id: string;
@@ -46,6 +47,10 @@ const QuestionBank = () => {
   const [showBulkDelete, setShowBulkDelete] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const { toast } = useToast();
+
+  const signedUrls = useSignedImageUrls(
+    questions.map((q) => (q.page_image_name ? `shared/${q.page_image_name}` : null))
+  );
 
   const fetchQuestions = async () => {
     if (!authUser) return;
@@ -105,8 +110,7 @@ const QuestionBank = () => {
   const getImageUrl = (question: UnifiedQuestion) => {
     if (!question.page_image_name) return "";
     const path = `shared/${question.page_image_name}`;
-    const { data } = supabase.storage.from("question-images").getPublicUrl(path);
-    return data.publicUrl;
+    return signedUrls[path] || "";
   };
 
   const handleSaveCrop = async (top: number, left: number, width: number, height: number) => {
