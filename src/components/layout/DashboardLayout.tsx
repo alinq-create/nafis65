@@ -5,6 +5,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { LogOut, LayoutDashboard, Users, BookOpen, FileText, ClipboardCheck, BarChart3, Upload, Menu } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import schoolLogo from "@/assets/school-logo-65.png";
+import HorizonDivider from "@/components/layout/HorizonDivider";
 
 const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   const { authUser, signOut } = useAuth();
@@ -90,8 +91,8 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   return (
     <div className="flex flex-col min-h-screen">
       {/* Top Header */}
-      <header className="bg-gradient-to-l from-[hsl(145,55%,42%)] via-[hsl(199,70%,45%)] to-[hsl(35,85%,55%)] px-4 py-3 shadow-md">
-        <div className="flex items-center gap-4">
+      <header className="relative overflow-hidden bg-gradient-to-l from-[hsl(145,55%,42%)] via-[hsl(199,70%,45%)] to-[hsl(35,85%,55%)] px-4 pt-3 pb-8 shadow-md">
+        <div className="relative z-10 flex items-center gap-4">
           {/* Hamburger button - mobile only */}
           <button
             onClick={() => setSidebarOpen(true)}
@@ -111,6 +112,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
             <p className="text-sm opacity-90">المتوسطة الخامسة والستون</p>
           </div>
         </div>
+        <HorizonDivider />
       </header>
 
       <div className="flex flex-1 pb-12">
