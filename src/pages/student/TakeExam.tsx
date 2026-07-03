@@ -126,7 +126,7 @@ const TakeExam = () => {
                   <div
                     className="w-full min-h-[300px] bg-muted"
                     style={{
-                      backgroundImage: `url(${getImageUrl(currentQuestion.page_image_name)})`,
+                      backgroundImage: `url(${getImageUrl(currentQuestion)})`,
                       backgroundSize: `${100 / (currentQuestion.frame_width || 1)}% ${100 / (currentQuestion.frame_height || 1)}%`,
                       backgroundPosition: `${((currentQuestion.frame_left || 0) / (1 - (currentQuestion.frame_width || 1))) * 100}% ${((currentQuestion.frame_top || 0) / (1 - (currentQuestion.frame_height || 1))) * 100}%`,
                       backgroundRepeat: "no-repeat",

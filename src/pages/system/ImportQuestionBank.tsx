@@ -320,16 +320,17 @@ const ImportQuestionBank = () => {
 
       setReport(importReport);
 
-      // 4. Build preview image URLs
+      // 4. Build preview image URLs (signed, since bucket is private)
       const urls: Record<string, string> = {};
-      for (const imageName of uniqueImageNames) {
-        if (!missingImages.includes(imageName)) {
-          const { data: urlData } = supabase.storage
+      await Promise.all(
+        uniqueImageNames.map(async (imageName) => {
+          if (missingImages.includes(imageName)) return;
+          const { data: signed } = await supabase.storage
             .from("question-images")
-            .getPublicUrl(`shared/${imageName}`);
-          urls[imageName] = urlData.publicUrl;
-        }
-      }
+            .createSignedUrl(`shared/${imageName}`, 3600);
+          if (signed?.signedUrl) urls[imageName] = signed.signedUrl;
+        })
+      );
       setImageUrls(urls);
       setPreviewMode(true);
 
