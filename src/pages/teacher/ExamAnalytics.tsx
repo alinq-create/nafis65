@@ -334,9 +334,7 @@ const ExamAnalytics = () => {
     setPreviewLoading(false);
   };
 
-  const getImageUrl = async (pageImageName: string) => {
-    return getSignedImageUrl(`shared/${pageImageName}`);
-  };
+  const [previewImageUrl, setPreviewImageUrl] = useState<string>("");
 
   if (loading) {
     return (

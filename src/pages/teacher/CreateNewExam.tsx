@@ -62,6 +62,16 @@ const CreateNewExam = () => {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const signedUrls = useSignedImageUrls(
+    questions.map((q) => {
+      if (!authUser || !q.page_image_name) return null;
+      const isOwn = q.teacher_id === authUser.user.id;
+      return isOwn
+        ? `${authUser.user.id}/${q.page_image_name}`
+        : `shared/${q.page_image_name}`;
+    })
+  );
+
   // Edit question states
   const [editingQuestion, setEditingQuestion] = useState<UnifiedQuestion | null>(null);
   const [editForm, setEditForm] = useState({ question_text: "", option_a: "", option_b: "", option_c: "", option_d: "", correct_answer: "" });
