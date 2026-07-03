@@ -382,29 +382,35 @@ export type Database = {
       get_teacher_questions: {
         Args: { p_subject: string }
         Returns: {
-          correct_answer: string
-          created_at: string
-          frame_height: number
-          frame_left: number
-          frame_top: number
-          frame_width: number
-          grade: string
-          id: string
-          notes: string
-          option_a: string
-          option_b: string
-          option_c: string
-          option_d: string
-          page_image_name: string
-          question_number: number
-          question_text: string
-          question_type: string
-          semester: string
-          source: string
-          subject: string
-          teacher_id: string
-          visible_to_students: boolean
+          correct_answer: string | null
+          created_at: string | null
+          frame_height: number | null
+          frame_left: number | null
+          frame_top: number | null
+          frame_width: number | null
+          grade: string | null
+          id: string | null
+          notes: string | null
+          option_a: string | null
+          option_b: string | null
+          option_c: string | null
+          option_d: string | null
+          page_image_name: string | null
+          question_number: number | null
+          question_text: string | null
+          question_type: string | null
+          semester: string | null
+          source: string | null
+          subject: string | null
+          teacher_id: string | null
+          visible_to_students: boolean | null
         }[]
+        SetofOptions: {
+          from: "*"
+          to: "teacher_question_bank_view"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       has_role: {
         Args: {
