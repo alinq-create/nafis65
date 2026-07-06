@@ -179,11 +179,12 @@ const StudentEntry = () => {
             <p className="mt-2 text-sm font-medium text-muted-foreground">أدخلي بياناتك للبدء بالاختبار</p>
           </div>
 
-          <Card className="border border-white/80 bg-white/95 shadow-[0_22px_55px_rgba(15,23,42,0.10)] backdrop-blur">
-            <CardHeader className="text-center pb-5 pt-7">
-              <CardTitle className="text-2xl font-extrabold">دخول الاختبار</CardTitle>
-            </CardHeader>
-            <CardContent className="px-6 pb-7">
+          <div className="rounded-xl bg-gradient-to-l from-primary via-accent to-warning p-[2px] shadow-[0_0_28px_rgba(14,116,144,0.32),0_0_52px_rgba(20,184,166,0.22)]">
+            <Card className="border-0 bg-white/95 shadow-[0_22px_55px_rgba(15,23,42,0.10)] backdrop-blur">
+              <CardHeader className="text-center pb-5 pt-7">
+                <CardTitle className="text-2xl font-extrabold">دخول الاختبار</CardTitle>
+              </CardHeader>
+              <CardContent className="px-6 pb-7">
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div className="space-y-2">
                   <Label className="font-bold">اسم الطالبة</Label>
@@ -232,8 +233,9 @@ const StudentEntry = () => {
                   {isLoading ? "جاري البحث..." : "دخول الاختبار"}
                 </Button>
               </form>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
 
         </div>
       </div>
