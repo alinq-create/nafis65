@@ -104,7 +104,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signIn = async (username: string, password: string) => {
-    const email = `${username}@nafes.app`;
+    const u = username.trim().toLowerCase();
+    const email = u.includes("@") ? u : `${u}@nafes.app`;
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       return { error: "اسم المستخدم أو كلمة المرور غير صحيحة" };
