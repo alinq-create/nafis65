@@ -51,37 +51,37 @@ serve(async (req) => {
       // Validate all inputs
       if (!username || typeof username !== "string" || username.length > 50 || !/^[a-zA-Z0-9._-]+$/.test(username)) {
         return new Response(JSON.stringify({ error: "اسم المستخدم يجب أن يكون بالإنجليزية فقط (أحرف وأرقام) وأقل من 50 حرف" }), {
-          status: 400,
+          status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       if (!name || typeof name !== "string" || name.length > 100) {
         return new Response(JSON.stringify({ error: "الاسم مطلوب وأقل من 100 حرف" }), {
-          status: 400,
+          status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       if (!password || typeof password !== "string" || password.length < 6 || password.length > 100) {
         return new Response(JSON.stringify({ error: "كلمة المرور يجب أن تكون بين 6 و 100 حرف" }), {
-          status: 400,
+          status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       if (!subject || typeof subject !== "string" || subject.length > 50) {
         return new Response(JSON.stringify({ error: "المادة مطلوبة" }), {
-          status: 400,
+          status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       if (typeof fromClass !== "number" || !Number.isInteger(fromClass) || fromClass < 1 || fromClass > 20) {
         return new Response(JSON.stringify({ error: "رقم الفصل (من) غير صالح" }), {
-          status: 400,
+          status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       if (typeof toClass !== "number" || !Number.isInteger(toClass) || toClass < 1 || toClass > 20 || toClass < fromClass) {
         return new Response(JSON.stringify({ error: "رقم الفصل (إلى) غير صالح" }), {
-          status: 400,
+          status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -96,8 +96,15 @@ serve(async (req) => {
 
       if (authError) {
         console.error("[manage-teacher] auth error:", authError);
-        return new Response(JSON.stringify({ error: "تعذر إنشاء حساب المعلمة" }), {
-          status: 400,
+        const code = (authError as any).code;
+        let msg = "تعذر إنشاء حساب المعلمة";
+        if (code === "weak_password") {
+          msg = "كلمة المرور ضعيفة أو شائعة ومسربة، يرجى اختيار كلمة مرور أقوى (حروف وأرقام ورموز)";
+        } else if (code === "email_exists" || code === "user_already_exists") {
+          msg = "اسم المستخدم مستخدم مسبقاً، اختر اسماً آخر";
+        }
+        return new Response(JSON.stringify({ error: msg }), {
+          status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -134,7 +141,7 @@ serve(async (req) => {
     if (action === "delete") {
       if (!userId) {
         return new Response(JSON.stringify({ error: "معرف المعلمة مطلوب" }), {
-          status: 400,
+          status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -192,7 +199,7 @@ serve(async (req) => {
     }
 
     return new Response(JSON.stringify({ error: "إجراء غير معروف" }), {
-      status: 400,
+      status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {

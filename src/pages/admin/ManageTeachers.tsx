@@ -96,7 +96,12 @@ const ManageTeachers = () => {
       });
 
       if (error || data?.error) {
-        throw new Error(data?.error || "حدث خطأ");
+        let msg = data?.error || "حدث خطأ";
+        try {
+          const body = await (error as any)?.context?.json?.();
+          if (body?.error) msg = body.error;
+        } catch { /* ignore */ }
+        throw new Error(msg);
       }
 
       toast({ title: "تمت إضافة المعلمة بنجاح" });
