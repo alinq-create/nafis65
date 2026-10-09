@@ -148,7 +148,7 @@ const QuestionBank = () => {
         const num = parseInt(form.question_number, 10);
         if (isNaN(num)) { setSaving(false); toast({ title: "رقم السؤال غير صالح", variant: "destructive" }); return; }
         ({ error } = await supabase.from("text_question_bank").insert({
-          ...fields, imported_by: authUser.id, subject: authUser.profile?.subject || "رياضيات",
+          ...fields, imported_by: authUser.user.id, subject: authUser.profile?.subject || "رياضيات",
           grade: form.grade.trim() || "-", semester: form.semester.trim() || "-", question_number: num,
         }));
       }
