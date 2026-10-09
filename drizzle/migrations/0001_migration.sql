@@ -1,0 +1,2 @@
+CREATE POLICY teachers_insert_text_questions ON public.text_question_bank FOR INSERT TO authenticated
+WITH CHECK (is_teacher() AND imported_by = auth.uid() AND subject = (SELECT p.subject FROM public.profiles p WHERE p.user_id = auth.uid() LIMIT 1));

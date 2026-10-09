@@ -9,7 +9,10 @@ import { Button } from "@/components/ui/button";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2 } from "lucide-react";
+import { Trash2, Pencil, Plus } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import ImageCropEditor from "@/components/teacher/ImageCropEditor";
 import { useSignedImageUrls } from "@/lib/imageUrls";
 
@@ -107,6 +110,56 @@ const QuestionBank = () => {
     setShowBulkDelete(false);
   };
 
+  const emptyForm = { question_number: "", grade: "", semester: "", question_text: "", option_a: "", option_b: "", option_c: "", option_d: "", correct_answer: "" };
+  const [formOpen, setFormOpen] = useState(false);
+  const [formTarget, setFormTarget] = useState<UnifiedQuestion | null>(null);
+  const [form, setForm] = useState(emptyForm);
+  const [saving, setSaving] = useState(false);
+  const setF = (k: keyof typeof emptyForm, v: string) => setForm((f) => ({ ...f, [k]: v }));
+
+  const openForm = (q: UnifiedQuestion | null) => {
+    setFormTarget(q);
+    setForm(q ? {
+      question_number: String(q.question_number ?? ""), grade: q.grade ?? "", semester: q.semester ?? "",
+      question_text: q.question_text ?? "", option_a: q.option_a ?? "", option_b: q.option_b ?? "",
+      option_c: q.option_c ?? "", option_d: q.option_d ?? "", correct_answer: q.correct_answer ?? "",
+    } : emptyForm);
+    setFormOpen(true);
+  };
+
+  const handleSaveForm = async () => {
+    if (!authUser) return;
+    if (!form.correct_answer.trim() || ((!formTarget || formTarget.source === "text") && !form.question_text.trim())) {
+      toast({ title: "يرجى تعبئة نص السؤال والإجابة الصحيحة", variant: "destructive" });
+      return;
+    }
+    setSaving(true);
+    let error;
+    if (formTarget?.source === "image") {
+      ({ error } = await supabase.from("question_bank").update({ correct_answer: form.correct_answer.trim() }).eq("id", formTarget.id));
+    } else {
+      const fields = {
+        question_text: form.question_text.trim(), option_a: form.option_a.trim(), option_b: form.option_b.trim(),
+        option_c: form.option_c.trim(), option_d: form.option_d.trim(), correct_answer: form.correct_answer.trim(),
+      };
+      if (formTarget) {
+        ({ error } = await supabase.from("text_question_bank").update(fields).eq("id", formTarget.id));
+      } else {
+        const num = parseInt(form.question_number, 10);
+        if (isNaN(num)) { setSaving(false); toast({ title: "رقم السؤال غير صالح", variant: "destructive" }); return; }
+        ({ error } = await supabase.from("text_question_bank").insert({
+          ...fields, imported_by: authUser.user.id, subject: authUser.profile?.subject || "رياضيات",
+          grade: form.grade.trim() || "-", semester: form.semester.trim() || "-", question_number: num,
+        }));
+      }
+    }
+    setSaving(false);
+    if (error) { toast({ title: "فشل حفظ السؤال", variant: "destructive" }); return; }
+    toast({ title: "تم حفظ السؤال في البنك" });
+    setFormOpen(false);
+    fetchQuestions();
+  };
+
   const getImageUrl = (question: UnifiedQuestion) => {
     if (!question.page_image_name) return "";
     const path = `shared/${question.page_image_name}`;
@@ -153,16 +206,10 @@ const QuestionBank = () => {
               {questions.length} سؤال في البنك
             </p>
           </div>
-          {questions.length > 0 && (
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => setShowBulkDelete(true)}
-            >
-              <Trash2 className="h-4 w-4 ml-2" />
-              حذف جميع الأسئلة
-            </Button>
-          )}
+          <Button size="sm" onClick={() => openForm(null)}>
+            <Plus className="h-4 w-4 ml-2" />
+            إضافة سؤال
+          </Button>
         </div>
 
         <Card>
@@ -186,7 +233,7 @@ const QuestionBank = () => {
                     <TableHead className="text-right">النوع</TableHead>
                     <TableHead className="text-right">الإجابة</TableHead>
                     <TableHead className="text-right">معاينة</TableHead>
-                    <TableHead className="text-right w-[60px]">حذف</TableHead>
+                    <TableHead className="text-right w-[100px]">إجراءات</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -226,7 +273,10 @@ const QuestionBank = () => {
                           </p>
                         )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="flex gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => openForm(q)} title="تعديل">
+                          <Pencil className="h-4 w-4" />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon"
@@ -266,6 +316,34 @@ const QuestionBank = () => {
           )}
         </DialogContent>
       </Dialog>
+      {/* Add / Edit Dialog */}
+      <Dialog open={formOpen} onOpenChange={setFormOpen}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{formTarget ? `تعديل السؤال ${formTarget.question_number}` : "إضافة سؤال جديد"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            {(!formTarget || formTarget.source === "text") && (
+              <>
+                {!formTarget && (
+                  <div className="grid grid-cols-3 gap-2">
+                    <div><Label>رقم السؤال</Label><Input type="number" value={form.question_number} onChange={(e) => setF("question_number", e.target.value)} /></div>
+                    <div><Label>الصف</Label><Input value={form.grade} onChange={(e) => setF("grade", e.target.value)} /></div>
+                    <div><Label>الفصل الدراسي</Label><Input value={form.semester} onChange={(e) => setF("semester", e.target.value)} /></div>
+                  </div>
+                )}
+                <div><Label>نص السؤال</Label><Textarea value={form.question_text} onChange={(e) => setF("question_text", e.target.value)} /></div>
+                {(["option_a", "option_b", "option_c", "option_d"] as const).map((k, i) => (
+                  <div key={k}><Label>الخيار {["أ", "ب", "ج", "د"][i]}</Label><Input value={form[k]} onChange={(e) => setF(k, e.target.value)} /></div>
+                ))}
+              </>
+            )}
+            <div><Label>الإجابة الصحيحة</Label><Input value={form.correct_answer} onChange={(e) => setF("correct_answer", e.target.value)} /></div>
+            <Button className="w-full" onClick={handleSaveForm} disabled={saving}>{saving ? "جارٍ الحفظ..." : "حفظ"}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deletingQuestion} onOpenChange={(open) => !open && setDeletingQuestion(null)}>
         <AlertDialogContent>
