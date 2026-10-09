@@ -96,8 +96,15 @@ serve(async (req) => {
 
       if (authError) {
         console.error("[manage-teacher] auth error:", authError);
-        return new Response(JSON.stringify({ error: "تعذر إنشاء حساب المعلمة" }), {
-          status: 400,
+        const code = (authError as any).code;
+        let msg = "تعذر إنشاء حساب المعلمة";
+        if (code === "weak_password") {
+          msg = "كلمة المرور ضعيفة أو شائعة ومسربة، يرجى اختيار كلمة مرور أقوى (حروف وأرقام ورموز)";
+        } else if (code === "email_exists" || code === "user_already_exists") {
+          msg = "اسم المستخدم مستخدم مسبقاً، اختر اسماً آخر";
+        }
+        return new Response(JSON.stringify({ error: msg }), {
+          status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
